@@ -8,93 +8,75 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-
-# Core Framework (Updated from requirements.txt)
-django = "^5.2.6"
-djangorestframework = "^3.16.1"
-
-# Custom & Internal Git Packages (Synced with branch/rev tags)
-appmonitor-client = { git = "https://github.com/dbca-wa/appmonitor_client.git" }
-django-cron = { git = "https://github.com/jorenham/django-cron.git", rev = "cec74656a6cada4c40fec43f46594bf332268ab1" }
-django-media-serv = { git = "https://github.com/dbca-wa/django-media-serv.git" }
-django-preserialize = { git = "https://github.com/xzzy/django-preserialize.git", rev = "dbf5755dba7c75264120fedbfac976777975879e" }
-django5-six = { git = "https://github.com/dbca-wa/django5-utils-six.git" }
-ledger-api-client = { git = "https://github.com/dbca-wa/ledger_api_client.git" }
-wagov-utils = { git = "https://github.com/dbca-wa/wagov_utils.git" }
-
-# Database & System Essentials
-psycopg2-binary = "^2.9.10"
-gunicorn = "^25.0.0"
-dj-database-url = "^3.0.1"
-dj-static = "^0.0.6"
-whitenoise = "^6.11.0"
-python-decouple = "^3.8"
-werkzeug = "^3.1.6"
-GDAL = "^3.13.3"
-
-# Newly Detected Dependencies (Added from requirements.txt changes)
-django-filter = "^25.1"
-django-recurrence = "^1.11.1"
-django-vite = "^3.1.0"
-boto3 = "^1.40.38"
-botocore = "^1.40.38"
-requests = "^2.33.1"
-urllib3 = "^2.7.0"
-setuptools = "^84.0.0"
-wheel = "^0.47.0"
-
-# Main Application Libraries (Synced to explicit versions)
-django-extensions = "^4.1"
-coverage = "^6.5.0"
-coveralls = "^3.3.1"
-reportlab = "^4.4.4"
-django-braces = "^1.17.0"
-django-datatables-view = "^1.20.0"
-django-reversion = "^6.0.0"
-django-reversion-compare = "^0.18.1"
-django-countries = "^7.6.1"
-django-dynamic-fixture = "^4.0.1"
-openpyxl = "^3.1.5"
-datapackage = "^1.15.4"
-python-dateutil = "^2.9.0.post0"
-py4j = "^0.10.9.9"
-djangorestframework-gis = "^1.2.0"
-djangorestframework-csv = "^3.0.2"
-pycountry = "^24.6.1"
-six = "^1.17.0"
-django-ical = "^1.9.2"
-django-taggit = "^6.1.0"
-geojson = "^3.2.0"
-unicodecsv = "^0.14.1"
-django-extra-fields = "^3.0.2"
-django-crispy-forms = "^2.4"
-django-reset-migrations = "^0.4.0"
-djangorestframework-datatables = "^0.7.2"
-django-confy = "^1.0.4"
-xlrd = "^2.0.2"
-xlwt = "^1.3.0"
-xlsxwriter = "^3.2.9"
-mixer = "^7.2.2"
-django-dirtyfields = "^1.9.7"
-django-multiselectfield = "^1.0.1"
-phonenumbers = "^9.0.14"
-django-treebeard = "^4.7.1"
-django-widget-tweaks = "^1.5.0"
-django-phonenumber-field = "^7.3.0"
-babel = "^2.17.0"
-pytz = "^2020.5"
+django = "^5.2.1"
+ledger-api-client = {git = "https://github.com/dbca-wa/ledger_api_client.git"}
+webtemplate-dbca = {git = "https://github.com/dbca-wa/webtemplate2.git"}
+django-extensions = ">=3.2.3"
+coverage = ">=6.5.0"
+coveralls = ">=3.3.1"
+reportlab = ">=4.2.2"
+django-braces = ">=1.15.0"
+django-datatables-view = ">=1.20.0"
+django-reversion = ">=5.0.12"
+django-reversion-compare = ">=0.15.0"
+django-countries = ">=7.5.1"
+django-cron = {git = "https://github.com/jorenham/django-cron.git"}
+django-dynamic-fixture = ">=3.1.3"
+django-preserialize = {git = "https://github.com/xzzy/django-preserialize.git"}
+openpyxl = ">=3.1.3"
+datapackage = ">=1.15,<2.0"
+python-dateutil = ">=2.8.2"
+py4j = ">=0.10.9.7"
+djangorestframework = ">=3.15.1"
+djangorestframework-gis = ">=1.0"
+djangorestframework-csv = ">=3.0.0"
+pycountry = ">=22.3.5"
+six = ">=1.16.0"
+django-ical = ">=1.8.3"
+django-taggit = ">=4.0.0"
+geojson = ">=3.1.0"
+unicodecsv = ">=0.14.1"
+django-extra-fields = ">=3.0.2"
+django-crispy-forms = ">=2.0"
+django-reset-migrations = ">=0.4.0"
+django-ckeditor-5 = ">=0.2"
+djangorestframework-datatables = ">=0.7.0"
+django-confy = ">=1.0.4"
+xlwt = ">=1.3.0"
+xlsxwriter = ">=3.2.0"
+gunicorn = ">=23.0.0"
+dj-static = ">=0.0.6"
+mixer = ">=7.2.2"
+django-dirtyfields = ">=1.9.2"
+django-multiselectfield = ">=0.1.12"
+dj-database-url = ">=2.2.0"
+werkzeug = ">=2.2.3"
+phonenumbers = ">=8.13.43"
+django-treebeard = ">=4.5.1"
+psycopg2-binary = ">=2.9.10"
+django-widget-tweaks = ">=1.5,<2.0"
+whitenoise = ">=5.3.0"
+django-media-serv = {git = "https://github.com/dbca-wa/django-media-serv.git"}
+python_decouple = ">=3.8"
+appmonitor-client = {git = "https://github.com/dbca-wa/appmonitor_client.git"}
+django5-six = {git = "https://github.com/dbca-wa/django5-utils-six.git"}
+django-phonenumber-field = ">=7.3,<8.0"
+babel = ">=2.14,<3.0"
+pytz = "^2020.1"
+setuptools = "^80.0.0"
+urllib3 = "^2.6.2"
 
 [tool.poetry.group.dev]
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-django-debug-toolbar = "^3.8"
-ipdb = "^0.13"
-pylint = "^2.13"
-djlint = "^1.0.0"
-flake8 = "^6.1"
-autopep8 = "^2.0"
-black = "^23.0"
+django-debug-toolbar = ">=3.8"
+ipdb = ">=0.13"
+pylint = ">=2.13"
+djlint = ">=1.0.0"
+flake8 = ">=6.1"
+autopep8 = ">=2.0"
+black = ">=23.0"
 pre-commit = "^4.6.0"
 
 [build-system]
