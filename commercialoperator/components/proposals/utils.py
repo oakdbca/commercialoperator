@@ -181,7 +181,7 @@ def generate_item_data(
     item_name, item, item_data, post_data, file_data, repetition, suffix
 ):
     item_data_list = []
-    for rep in xrange(0, repetition):
+    for rep in range(repetition):
         child_data = {}
         for child_item in item.get("children"):
             child_data.update(
@@ -411,7 +411,7 @@ class AssessorDataSearch(object):
         self, item_name, item, item_data, post_data, file_data, repetition, suffix
     ):
         item_data_list = []
-        for rep in xrange(0, repetition):
+        for rep in range(repetition):
             child_data = {}
             for child_item in item.get("children"):
                 child_data.update(
@@ -490,7 +490,7 @@ class CommentDataSearch(object):
         self, item_name, item, item_data, post_data, file_data, repetition, suffix
     ):
         item_data_list = []
-        for rep in xrange(0, repetition):
+        for rep in range(repetition):
             child_data = {}
             for child_item in item.get("children"):
                 child_data.update(
@@ -568,7 +568,7 @@ class SpecialFieldsSearch(object):
         self, item_name, item, item_data, post_data, file_data, repetition, suffix
     ):
         item_data_list = []
-        for rep in xrange(0, repetition):
+        for rep in range(repetition):
             child_data = {}
             for child_item in item.get("children"):
                 child_data.update(
