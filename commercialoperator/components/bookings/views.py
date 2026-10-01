@@ -1,79 +1,80 @@
-from django.http import Http404, HttpResponse, HttpResponseRedirect
-from django.urls import reverse
-from django.shortcuts import render, get_object_or_404, redirect
-from django.views.generic.base import View, TemplateView
+import logging
+from urllib.parse import urljoin
+
 from django.conf import settings
-from django.db import transaction
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseRedirect,
+)
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.views.generic.base import TemplateView, View
+from ledger_api_client.helpers import is_payment_admin
+from ledger_api_client.ledger_models import EmailUserRO as EmailUser
+from ledger_api_client.ledger_models import Invoice
+from rest_framework import serializers, status, views
 from rest_framework.permissions import AllowAny
-from rest_framework import status, views, serializers
 from rest_framework.response import Response
 
-from ledger_api_client.ledger_models import EmailUserRO as EmailUser
-from commercialoperator.components.proposals.models import Proposal
-from commercialoperator.components.compliances.models import Compliance
-from commercialoperator.components.main.models import ApplicationType
-from commercialoperator.components.organisations.models import Organisation, OrganisationContact
-from commercialoperator.components.bookings.context_processors import template_context
-from commercialoperator.components.bookings.invoice_compliance_pdf import (
-    create_invoice_compliance_pdf_bytes,
-)
 from commercialoperator.components.bookings.confirmation_pdf import (
     create_confirmation_pdf_bytes,
 )
-from commercialoperator.components.bookings.monthly_confirmation_pdf import (
-    create_monthly_confirmation_pdf_bytes,
-)
+from commercialoperator.components.bookings.context_processors import template_context
 from commercialoperator.components.bookings.email import (
-    send_invoice_tclass_email_notification,
-    send_confirmation_tclass_email_notification,
     send_application_fee_invoice_tclass_email_notification,
     send_compliance_fee_invoice_events_email_notification,
-)
-from commercialoperator.components.bookings.utils import (
-    create_booking,
-    get_invoice_pdf,
-    get_invoice_properties,
-    get_session_booking,
-    set_session_booking,
-    delete_session_booking,
-    create_lines,
-    checkout,
-    checkout_existing_invoice,
-    create_fee_lines,
-    create_compliance_fee_lines,
-    get_session_application_invoice,
-    set_session_application_invoice,
-    get_session_compliance_invoice,
-    set_session_compliance_invoice,
-    get_session_filming_invoice,
-    set_session_filming_invoice,
-    create_bpay_invoice,
-    create_other_invoice,
-    create_monthly_confirmation,
+    send_confirmation_tclass_email_notification,
+    send_invoice_tclass_email_notification,
 )
 from commercialoperator.components.bookings.models import (
-    Booking,
-    ParkBooking,
-    BookingInvoice,
     ApplicationFee,
     ApplicationFeeInvoice,
+    Booking,
+    BookingInvoice,
     ComplianceFee,
     ComplianceFeeInvoice,
     FilmingFee,
     FilmingFeeInvoice,
+    ParkBooking,
 )
-
+from commercialoperator.components.bookings.monthly_confirmation_pdf import (
+    create_monthly_confirmation_pdf_bytes,
+)
+from commercialoperator.components.bookings.utils import (
+    checkout,
+    checkout_existing_invoice,
+    create_booking,
+    create_bpay_invoice,
+    create_compliance_fee_lines,
+    create_fee_lines,
+    create_lines,
+    create_monthly_confirmation,
+    create_other_invoice,
+    delete_session_booking,
+    get_invoice_pdf,
+    get_invoice_properties,
+    get_session_application_invoice,
+    get_session_booking,
+    get_session_compliance_invoice,
+    get_session_filming_invoice,
+    set_session_application_invoice,
+    set_session_booking,
+    set_session_compliance_invoice,
+    set_session_filming_invoice,
+)
+from commercialoperator.components.compliances.models import Compliance
+from commercialoperator.components.main.models import ApplicationType
+from commercialoperator.components.organisations.models import (
+    Organisation,
+    OrganisationContact,
+)
+from commercialoperator.components.proposals.models import Proposal
 from commercialoperator.components.proposals.utils import proposal_submit
-
-from ledger_api_client.ledger_models import Invoice
-
-from commercialoperator.helpers import is_internal, is_in_organisation_contacts
-from ledger_api_client.helpers import is_payment_admin
-
-from urllib.parse import urljoin
-
-import logging
+from commercialoperator.helpers import is_in_organisation_contacts, is_internal
 
 logger = logging.getLogger("payment_checkout")
 
@@ -90,26 +91,30 @@ class ApplicationFeeView(TemplateView):
             proposal = self.get_object()
 
             user = request.user
-            try:
-                user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
-                if not (
-                    is_internal(self.request) or
-                    proposal.org_applicant_id in user_orgs or proposal.submitter == user
-                ):
-                    raise PermissionDenied
-            except:
-                raise
+            user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
+            if not (
+                is_internal(self.request)
+                or proposal.org_applicant_id in user_orgs
+                or proposal.submitter == user
+            ):
+                raise PermissionDenied
 
-            if request.user and isinstance(request.user,EmailUser):
+            if request.user and isinstance(request.user, EmailUser):
                 if not proposal.submitter:
-                    proposal.submitter = request.user #NOTE: submitter should already be set
+                    proposal.submitter = (
+                        request.user
+                    )  # NOTE: submitter should already be set
                     proposal.save()
-                #Same org, different submitter
-                if proposal.org_applicant:
-                    if OrganisationContact.objects.filter(organisation=proposal.org_applicant,email=request.user.email).exists():
-                        proposal.submitter = request.user
-                        proposal.save()
-            
+                # Same org, different submitter
+                if (
+                    proposal.org_applicant
+                    and OrganisationContact.objects.filter(
+                        organisation=proposal.org_applicant, email=request.user.email
+                    ).exists()
+                ):
+                    proposal.submitter = request.user
+                    proposal.save()
+
             application_fee = ApplicationFee.objects.create(
                 proposal=proposal,
                 created_by=request.user,
@@ -120,8 +125,15 @@ class ApplicationFeeView(TemplateView):
                 lines = create_fee_lines(proposal)
 
                 set_session_application_invoice(request.session, application_fee)
-                return_url = request.build_absolute_uri(reverse("fee_success", kwargs={"reference": proposal.lodgement_number}))
-                return_preload_url = settings.COMMERCIALOPERATOR_EXTERNAL_URL + reverse("fee_success_preload", kwargs={"reference": proposal.lodgement_number})
+                return_url = request.build_absolute_uri(
+                    reverse(
+                        "fee_success", kwargs={"reference": proposal.lodgement_number}
+                    )
+                )
+                return_preload_url = settings.COMMERCIALOPERATOR_EXTERNAL_URL + reverse(
+                    "fee_success_preload",
+                    kwargs={"reference": proposal.lodgement_number},
+                )
                 checkout_response = checkout(
                     request,
                     proposal,
@@ -129,25 +141,23 @@ class ApplicationFeeView(TemplateView):
                     return_url,
                     return_preload_url,
                     invoice_text="Application Fee",
-                    reference=proposal.lodgement_number
+                    reference=proposal.lodgement_number,
                 )
-                
+
                 # Set session variables
                 request.session["payment_pk"] = proposal.pk
                 request.session["payment_model"] = "proposal"
 
                 logger.info(
                     "{} built payment line item {} for Application Fee and handing over to payment gateway".format(
-                        "User {} with id {}".format(
-                            proposal.submitter.get_full_name(), proposal.submitter.id
-                        ),
+                        f"User {proposal.submitter.get_full_name()} with id {proposal.submitter.id}",
                         proposal.id,
                     )
                 )
                 return checkout_response
 
         except Exception as e:
-            logger.error("Error Creating Application Fee: {}".format(e))
+            logger.error(f"Error Creating Application Fee: {e}")
             if application_fee:
                 application_fee.delete()
             raise
@@ -164,25 +174,24 @@ class ComplianceFeeView(TemplateView):
         compliance = self.get_object()
 
         user = request.user
-        try:
-            user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
-            if not (
-                is_internal(self.request) or
-                compliance.proposal.org_applicant in user_orgs or compliance.proposal.submitter == user
-            ):
-                raise PermissionDenied
-        except:
-            raise
-        
+
+        user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
+        if not (
+            is_internal(self.request)
+            or compliance.proposal.org_applicant in user_orgs
+            or compliance.proposal.submitter == user
+        ):
+            raise PermissionDenied
+
         compliance_fee = ComplianceFee.objects.create(
             compliance=compliance,
             created_by=request.user,
             payment_type=ComplianceFee.PAYMENT_TYPE_TEMPORARY,
         )
-        
-        #NOTE: files have to be uploaded prior to payment
-        #TODO: file upload does not appear to work - investigate (here and in the standard submit)
-        #TODO: consider file upload as a separate process to submission so users don't have to upload every submit attempt
+
+        # NOTE: files have to be uploaded prior to payment
+        # TODO: file upload does not appear to work - investigate (here and in the standard submit)
+        # TODO: consider file upload as a separate process to submission so users don't have to upload every submit attempt
         if request.FILES:
             for f in request.FILES:
                 document = compliance.documents.create(name=str(request.FILES[f]))
@@ -193,8 +202,16 @@ class ComplianceFeeView(TemplateView):
             with transaction.atomic():
                 set_session_compliance_invoice(request.session, compliance_fee)
                 lines = create_compliance_fee_lines(compliance)
-                return_url = request.build_absolute_uri(reverse("compliance_fee_success", kwargs={"reference": compliance.lodgement_number}))
-                return_preload_url = settings.COMMERCIALOPERATOR_EXTERNAL_URL + reverse("compliance_success_preload", kwargs={"reference": compliance.lodgement_number})
+                return_url = request.build_absolute_uri(
+                    reverse(
+                        "compliance_fee_success",
+                        kwargs={"reference": compliance.lodgement_number},
+                    )
+                )
+                return_preload_url = settings.COMMERCIALOPERATOR_EXTERNAL_URL + reverse(
+                    "compliance_success_preload",
+                    kwargs={"reference": compliance.lodgement_number},
+                )
                 checkout_response = checkout(
                     request,
                     compliance.proposal,
@@ -202,27 +219,24 @@ class ComplianceFeeView(TemplateView):
                     return_url,
                     return_preload_url,
                     invoice_text="Per participant licence charge",
-                    reference=compliance.lodgement_number
+                    reference=compliance.lodgement_number,
                 )
 
                 # Set session variables
-                #TODO rework to use its own model (if necessary)
+                # TODO rework to use its own model (if necessary)
                 request.session["payment_pk"] = compliance.proposal.pk
                 request.session["payment_model"] = "proposal"
 
                 logger.info(
                     "{} built payment line item {} for Compliance Fee and handing over to payment gateway".format(
-                        "User {} with id {}".format(
-                            compliance.proposal.submitter.get_full_name(),
-                            compliance.proposal.submitter.id,
-                        ),
+                        f"User {compliance.proposal.submitter.get_full_name()} with id {compliance.proposal.submitter.id}",
                         compliance.id,
                     )
                 )
                 return checkout_response
 
         except Exception as e:
-            logger.error("Error Creating Compliance Fee: {}".format(e))
+            logger.error(f"Error Creating Compliance Fee: {e}")
             if compliance_fee:
                 compliance_fee.delete()
             raise
@@ -239,16 +253,15 @@ class FilmingFeeView(TemplateView):
         proposal = self.get_object()
 
         user = request.user
-        try:
-            user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
-            if not (
-                is_internal(self.request) or
-                proposal.org_applicant in user_orgs or proposal.submitter == user
-            ):
-                raise PermissionDenied
-        except:
-            raise
-        
+
+        user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
+        if not (
+            is_internal(self.request)
+            or proposal.org_applicant in user_orgs
+            or proposal.submitter == user
+        ):
+            raise PermissionDenied
+
         filming_fee = proposal.filming_fees.order_by("-id").first()
         inv_ref = (
             filming_fee.filming_fee_invoices.order_by("-id").first().invoice_reference
@@ -267,9 +280,7 @@ class FilmingFeeView(TemplateView):
 
             logger.info(
                 "{} built payment line item {} for Proposal Fee and handing over to payment gateway".format(
-                    "User {} with id {}".format(
-                        proposal.submitter.get_full_name(), proposal.submitter.id
-                    ),
+                    f"User {proposal.submitter.get_full_name()} with id {proposal.submitter.id}",
                     proposal.id,
                 )
             )
@@ -281,167 +292,160 @@ class FilmingFeeView(TemplateView):
             return checkout_response
 
         except Exception as e:
-            logger.error("Error Creating Proposal Fee: {}".format(e))
+            logger.error(f"Error Creating Proposal Fee: {e}")
             if filming_fee:
                 filming_fee.delete()
             raise
 
-#TODO (may not be needed, in which case remove)
-class DeferredInvoicingPreviewView(TemplateView):
+
+# TODO (may not be needed, in which case remove)
+class DeferredInvoicingPreviewView(View):
     template_name = "commercialoperator/booking/preview_deferred.html"
 
     def post(self, request, *args, **kwargs):
-
-        payment_method = self.request.GET.get("method")
-        context = template_context(self.request)
-        proposal_id = int(kwargs["proposal_pk"])
-        proposal = Proposal.objects.get(id=proposal_id)
-
+        proposal = get_object_or_404(Proposal, id=kwargs["proposal_pk"])
         user = request.user
-        try:
-            user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
-            if not (
-                is_internal(self.request) or
-                proposal.org_applicant in user_orgs or proposal.submitter == user
-            ):
-                raise PermissionDenied
-        except:
-            raise
+
+        # Permission check
+        is_user_org = (
+            proposal.org_applicant_id is not None
+            and user.commercialoperator_organisations.filter(
+                id=proposal.org_applicant_id
+            ).exists()
+        )
+        if not (is_internal(request) or is_user_org or proposal.submitter == user):
+            raise PermissionDenied
+
+        # Check deferred invoicing eligibility
+        org = proposal.org_applicant
+        is_allowed = isinstance(org, Organisation) and (
+            org.monthly_invoicing_allowed
+            or org.bpay_allowed
+            or (settings.OTHER_PAYMENT_ALLOWED and is_payment_admin(user))
+        )
+
+        if not is_allowed:
+            logger.warning(
+                f"Deferred invoicing not allowed for Proposal {proposal.id} (User: {user.id})"
+            )
+            raise PermissionDenied(
+                "Deferred invoicing is not permitted for this organisation."
+            )
 
         try:
-            submitter = proposal.applicant
-        except:
-            submitter = proposal.submitter
+            lines = create_lines(request)
+            payment_details = request.POST.get("payment")
 
-        if isinstance(proposal.org_applicant, Organisation) and (
-            proposal.org_applicant.monthly_invoicing_allowed
-            or proposal.org_applicant.bpay_allowed
-            or (settings.OTHER_PAYMENT_ALLOWED and is_payment_admin(request.user))
-        ):
-            try:
-                lines = create_lines(request)
-                logger.info(
-                    "{} Show Park Bookings Preview for BPAY/Other/monthly invoicing".format(
-                        "User {} with id {}".format(
-                            proposal.submitter.get_full_name(), proposal.submitter.id
-                        ),
-                        proposal.id,
-                    )
-                )
-                context.update(
-                    {
-                        "lines": lines,
-                        "line_details": request.POST["payment"],
-                        "proposal_id": proposal_id,
-                        "submitter": submitter,
-                        "payment_method": payment_method,
-                    }
-                )
-                return render(request, self.template_name, context)
+            logger.info(
+                "Show Park Bookings Preview for BPAY/Other/monthly invoicing for "
+                f"User {proposal.submitter.get_full_name()} (ID: {proposal.submitter.id})"
+            )
 
-            except Exception as e:
-                logger.error("Error creating booking preview: {}".format(e))
-        else:
-            logger.error("Error creating booking preview: {}".format(e))
-            raise
+            context = {
+                **template_context(request),
+                "lines": lines,
+                "line_details": payment_details,
+                "proposal_id": proposal.id,
+                "submitter": getattr(proposal, "applicant", proposal.submitter),
+                "payment_method": request.GET.get("method"),
+            }
+            return render(request, self.template_name, context)
 
-#TODO replace below with appropriate payment functionality (may not be needed, in which case remove)
-class DeferredInvoicingView(TemplateView):
+        except Exception:
+            logger.exception(
+                f"Error creating booking preview for Proposal {proposal.id}"
+            )
+            return HttpResponseBadRequest("Unable to generate booking preview.")
+
+
+# TODO replace below with appropriate payment functionality (may not be needed, in which case remove)
+class DeferredInvoicingView(View):
     template_name = "commercialoperator/booking/success.html"
 
     def post(self, request, *args, **kwargs):
-
-        payment_method = self.request.POST.get("method")
-        context = template_context(self.request)
-        proposal_id = int(kwargs["proposal_pk"])
-        proposal = Proposal.objects.get(id=proposal_id)
-
+        proposal = get_object_or_404(Proposal, id=kwargs["proposal_pk"])
         user = request.user
-        try:
-            user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
-            if not (
-                is_internal(self.request) or
-                proposal.org_applicant in user_orgs or proposal.submitter == user
-            ):
-                raise PermissionDenied
-        except:
-            raise
+        payment_method = request.POST.get("method")
 
-        try:
-            submitter = proposal.applicant
-        except:
-            submitter = proposal.submitter
+        # 1. Base permission check
+        is_user_org = (
+            proposal.org_applicant_id is not None
+            and user.commercialoperator_organisations.filter(
+                id=proposal.org_applicant_id
+            ).exists()
+        )
+        if not (is_internal(request) or is_user_org or proposal.submitter == user):
+            raise PermissionDenied
 
-        if isinstance(proposal.org_applicant, Organisation):
-            try:
-                if proposal.org_applicant.bpay_allowed and payment_method == "bpay":
-                    booking_type = Booking.BOOKING_TYPE_INTERNET
-                elif (
-                    proposal.org_applicant.monthly_invoicing_allowed
-                    and payment_method == "monthly_invoicing"
-                ):
-                    booking_type = Booking.BOOKING_TYPE_MONTHLY_INVOICING
-                else:
-                    booking_type = Booking.BOOKING_TYPE_RECEPTION
+        org = proposal.org_applicant
+        if not isinstance(org, Organisation):
+            logger.error(
+                f"Proposal {proposal.id} applicant is not a valid Organisation."
+            )
+            raise PermissionDenied("A valid organisation applicant is required.")
 
-                booking = create_booking(request, proposal, booking_type=booking_type)
-                invoice_reference = None
-                if booking and payment_method == "bpay":
-                    # BPAY/OTHER invoice are created immediately. Monthly invoices are created later by Cron
-                    ret = create_bpay_invoice(submitter, booking)
-                    invoice_reference = booking.invoice.reference
+        # 2. Validate 'other' payment permissions BEFORE performing DB writes
+        if payment_method == "other" and not is_payment_admin(user):
+            raise PermissionDenied(
+                "You do not have permission to use this payment method."
+            )
 
-                if booking and payment_method == "other":
-                    # BPAY/Other invoice are created immediately. Monthly invoices are created later by Cron
-                    ret = create_other_invoice(submitter, booking)
-                    invoice_reference = booking.invoice.reference
-
-                if booking and payment_method == "monthly_invoicing":
-                    # For monthly_invoicing, invoice is created later by Cron. Now we only create a confirmation
-                    ret = create_monthly_confirmation(submitter, booking)
-
-                logger.info(
-                    "{} Created Park Bookings with payment method {} for Proposal ID {}".format(
-                        "User {} with id {}".format(
-                            proposal.submitter.get_full_name(), proposal.submitter.id
-                        ),
-                        payment_method,
-                        proposal.id,
-                    )
-                )
-                # send_monthly_invoicing_confirmation_tclass_email_notification(request, booking, invoice, recipients=[recipient])
-                context.update(
-                    {
-                        "booking": booking,
-                        "booking_id": booking.id,
-                        "submitter": submitter,
-                        "monthly_invoicing": (
-                            True if payment_method == "monthly_invoicing" else False
-                        ),
-                        "invoice_reference": invoice_reference,
-                    }
-                )
-                if payment_method == "other":
-                    if is_payment_admin(request.user):
-                        return HttpResponseRedirect(
-                            reverse("payments:invoice-payment")
-                            + "?invoice={}".format(invoice_reference)
-                        )
-                    else:
-                        raise PermissionDenied
-                else:
-                    return render(request, self.template_name, context)
-
-            except Exception as e:
-                logger.error("Error Creating booking: {}".format(e))
-                if booking:
-                    booking.delete()
-                raise
+        # Determine booking type
+        if org.bpay_allowed and payment_method == "bpay":
+            booking_type = Booking.BOOKING_TYPE_INTERNET
+        elif org.monthly_invoicing_allowed and payment_method == "monthly_invoicing":
+            booking_type = Booking.BOOKING_TYPE_MONTHLY_INVOICING
         else:
-            logger.error("Error Creating booking: {}".format(e))
+            booking_type = Booking.BOOKING_TYPE_RECEPTION
+
+        submitter = getattr(proposal, "applicant", proposal.submitter)
+        booking = None
+        invoice_reference = None
+
+        try:
+            booking = create_booking(request, proposal, booking_type=booking_type)
+
+            if booking:
+                if payment_method == "bpay":
+                    create_bpay_invoice(submitter, booking)
+                    invoice_reference = booking.invoice.reference
+                elif payment_method == "other":
+                    create_other_invoice(submitter, booking)
+                    invoice_reference = booking.invoice.reference
+                elif payment_method == "monthly_invoicing":
+                    create_monthly_confirmation(submitter, booking)
+
+            logger.info(
+                f"User {proposal.submitter.get_full_name()} (ID: {proposal.submitter.id}) "
+                f"created booking {getattr(booking, 'id', None)} with method '{payment_method}' "
+                f"for Proposal ID {proposal.id}"
+            )
+
+            # Redirect if payment method is "other"
+            if payment_method == "other":
+                redirect_url = reverse("payments:invoice-payment")
+                return HttpResponseRedirect(
+                    f"{redirect_url}?invoice={invoice_reference}"
+                )
+
+            context = {
+                **template_context(request),
+                "booking": booking,
+                "booking_id": getattr(booking, "id", None),
+                "submitter": submitter,
+                "monthly_invoicing": (payment_method == "monthly_invoicing"),
+                "invoice_reference": invoice_reference,
+            }
+            return render(request, self.template_name, context)
+
+        except Exception:
+            logger.exception(f"Error creating booking for Proposal ID {proposal.id}")
+            if booking and getattr(booking, "id", None):
+                booking.delete()
             raise
 
-#TODO: determine if non-cc payments are still required - handle as needed with alternative payment approaches (if required) 
+
+# TODO: determine if non-cc payments are still required - handle as needed with alternative payment approaches (if required)
 class MakePaymentView(TemplateView):
     """View to handle Park Entry Fees:Make Payment"""
 
@@ -453,16 +457,15 @@ class MakePaymentView(TemplateView):
         proposal = Proposal.objects.get(id=proposal_id)
 
         user = request.user
-        try:
-            user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
-            if not (
-                is_internal(self.request) or
-                proposal.org_applicant in user_orgs or proposal.submitter == user
-            ):
-                raise PermissionDenied
-        except:
-            raise
-        
+
+        user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
+        if not (
+            is_internal(self.request)
+            or proposal.org_applicant in user_orgs
+            or proposal.submitter == user
+        ):
+            raise PermissionDenied
+
         booking = None
 
         try:
@@ -470,18 +473,26 @@ class MakePaymentView(TemplateView):
                 request, proposal, booking_type=Booking.BOOKING_TYPE_TEMPORARY
             )
 
+            unique_sets = {frozenset(d.items()) for d in booking.as_line_items}
+
             # check for duplicate bookings/lines
-            unique_lines = [
-                dict(s)
-                for s in set(frozenset(d.items()) for d in booking.as_line_items)
-            ]
+            unique_lines = [dict(s) for s in unique_sets]
+
             if len(booking.as_line_items) != len(unique_lines):
                 logger.warning("Booking contains dupicate rows.")
 
             with transaction.atomic():
                 set_session_booking(request.session, booking)
-                return_url = request.build_absolute_uri(reverse("public_booking_success", kwargs={"reference": proposal.lodgement_number}))
-                return_preload_url = settings.COMMERCIALOPERATOR_EXTERNAL_URL + reverse("public_booking_success_preload", kwargs={"reference": proposal.lodgement_number})
+                return_url = request.build_absolute_uri(
+                    reverse(
+                        "public_booking_success",
+                        kwargs={"reference": proposal.lodgement_number},
+                    )
+                )
+                return_preload_url = settings.COMMERCIALOPERATOR_EXTERNAL_URL + reverse(
+                    "public_booking_success_preload",
+                    kwargs={"reference": proposal.lodgement_number},
+                )
                 checkout_response = checkout(
                     request,
                     proposal,
@@ -489,46 +500,48 @@ class MakePaymentView(TemplateView):
                     return_url,
                     return_preload_url,
                     invoice_text="Payment Invoice",
-                    reference=proposal.lodgement_number
+                    reference=proposal.lodgement_number,
                 )
 
                 # Set session variables
-                #TODO use booking pk and model instead
+                # TODO use booking pk and model instead
                 request.session["payment_pk"] = proposal.pk
                 request.session["payment_model"] = "proposal"
 
                 logger.info(
                     "{} built payment line items {} for Park Bookings and handing over to payment gateway".format(
-                        "User {} with id {}".format(
-                            proposal.submitter.get_full_name(), proposal.submitter.id
-                        ),
+                        f"User {proposal.submitter.get_full_name()} with id {proposal.submitter.id}",
                         proposal.id,
                     )
                 )
                 return checkout_response
 
         except Exception as e:
-            logger.error("Error Creating booking: {}".format(e))
+            logger.error(f"Error Creating booking: {e}")
             raise
 
 
 class ComplianceFeeSuccessViewPreload(views.APIView):
-    permission_classes = [AllowAny] 
+    permission_classes = (AllowAny,)
 
     def get(self, request, reference, format=None):
-        print("ComplianceFeeSuccessViewPreload")
+        logger.debug("ComplianceFeeSuccessViewPreload")
 
-        invoice_ref = request.GET.get('invoice')
+        invoice_ref = request.GET.get("invoice")
 
         try:
             compliance = Compliance.objects.get(lodgement_number=reference)
-            print("compliance:",compliance)
-        except Exception as e:
-            print(e)
-            return redirect('home')
-        
-        #use the latest Fee record
-        compliance_fee = ComplianceFee.objects.filter(compliance=compliance).order_by("created").last()
+            logger.debug(f"Compliance: {compliance}")
+        except Exception:
+            logger.exception()
+            return redirect("home")
+
+        # use the latest Fee record
+        compliance_fee = (
+            ComplianceFee.objects.filter(compliance=compliance)
+            .order_by("created")
+            .last()
+        )
 
         _, _ = ComplianceFeeInvoice.objects.get_or_create(
             compliance_fee=compliance_fee, invoice_reference=invoice_ref
@@ -551,49 +564,58 @@ class ComplianceFeeSuccessViewPreload(views.APIView):
                     compliance.save()
                     success = False
                 else:
-                    logger.error(
-                        "Invoice payment status is {}".format(payment_status)
+                    logger.error(f"Invoice payment status is {payment_status}")
+                    raise serializers.ValidationError(
+                        f"Invoice payment status is {payment_status}"
                     )
-                    raise serializers.ValidationError("Invoice payment status is {}".format(payment_status))
 
-            except Exception as e:
-                print(e)
-                raise serializers.ValidationError("Fee success preload failed")
+            except Exception:
+                msg = "Fee success preload failed"
+                logger.exception(msg)
+                raise serializers.ValidationError(msg)
 
             if success:
                 compliance_fee.save()
                 try:
-                    send_compliance_fee_invoice_events_email_notification( #TODO fix this
-                        request, compliance, inv, recipients=[compliance.proposal.submitter.email]
+                    send_compliance_fee_invoice_events_email_notification(  # TODO fix this
+                        request,
+                        compliance,
+                        inv,
+                        recipients=[compliance.proposal.submitter.email],
                     )
-                except:
-                    #log the error but do not invalidate the payment and subsequent compliance submission
-                    logger.error("Unable to send compliance fee invoice email notification")
+                except Exception as e:
+                    # log the error but do not invalidate the payment and subsequent compliance submission
+                    logger.exception(
+                        "Unable to send compliance fee invoice email notification",
+                        exc_info=e,
+                    )
 
         return Response(status=status.HTTP_200_OK)
-    
+
+
 class ComplianceFeeSuccessView(TemplateView):
     template_name = "commercialoperator/booking/success_compliance_fee.html"
 
     def get(self, request, *args, **kwargs):
-        print("ComplianceFeeSuccessView")
+        logger.debug("ComplianceFeeSuccessView")
         lodgement_number = kwargs.get("reference")
 
         try:
             compliance = Compliance.objects.get(lodgement_number=lodgement_number)
-        except:
+        except Compliance.DoesNotExist:
             raise serializers.ValidationError("Compliance does not exist")
-        
+        except Compliance.MultipleObjectsReturned:
+            raise serializers.ValidationError("Multiple Compliances returned")
+
         user = request.user
-        try:
-            user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
-            if not (
-                is_internal(self.request) or
-                compliance.proposal.org_applicant in user_orgs or compliance.proposal.submitter == user
-            ):
-                raise PermissionDenied
-        except:
-            raise
+
+        user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
+        if not (
+            is_internal(self.request)
+            or compliance.proposal.org_applicant in user_orgs
+            or compliance.proposal.submitter == user
+        ):
+            raise PermissionDenied
 
         compliance_fee = get_session_compliance_invoice(request.session)
         fee_inv = compliance_fee.compliance_fee_invoices.order_by("-id").first()
@@ -601,36 +623,43 @@ class ComplianceFeeSuccessView(TemplateView):
 
         try:
             inv = Invoice.objects.get(reference=invoice_ref)
-        except:
+        except Invoice.DoesNotExist:
             inv = None
 
-        context = {"proposal": compliance.proposal, "submitter": compliance.submitter, "fee_invoice": inv}
+        context = {
+            "proposal": compliance.proposal,
+            "submitter": compliance.submitter,
+            "fee_invoice": inv,
+        }
         return render(request, self.template_name, context)
 
 
 class FilmingFeeSuccessViewPreload(views.APIView):
-    
-    permission_classes = [AllowAny] 
+    permission_classes = (AllowAny,)
 
     def get(self, request, reference, format=None):
-        print("FilmFeeSuccessViewPreload")
+        logger.debug("FilmFeeSuccessViewPreload")
 
-        invoice_ref = request.GET.get('invoice')
+        invoice_ref = request.GET.get("invoice")
 
         try:
             proposal = Proposal.objects.get(lodgement_number=reference)
-            print("proposal:",proposal)
-        except Exception as e:
-            print(e)
-            return redirect('home')
+            logger.debug(f"proposal: {proposal}")
+        except Exception:
+            logger.exception()
+            return redirect("home")
 
-        try:
-            filming_fee = FilmingFeeInvoice.objects.filter(invoice_reference=invoice_ref).last().filming_fee
-        except:
+        invoice = FilmingFeeInvoice.objects.filter(invoice_reference=invoice_ref).last()
+
+        if not invoice:
             raise serializers.ValidationError("Filming Fee not found")
 
+        filming_fee = invoice.filming_fee
+
         if filming_fee.proposal != proposal:
-            raise serializers.ValidationError("Filming Fee Proposal does not match provided lodgement number")
+            raise serializers.ValidationError(
+                "Filming Fee Proposal does not match provided lodgement number"
+            )
 
         if filming_fee.payment_type == FilmingFee.PAYMENT_TYPE_TEMPORARY:
             filming_fee.payment_type = ApplicationFee.PAYMENT_TYPE_INTERNET
@@ -646,62 +675,67 @@ class FilmingFeeSuccessViewPreload(views.APIView):
                     proposal.fee_invoice_reference = invoice_ref
                     proposal.save()
                     proposal.final_approval()
-                    proposal.reset_application_discount(proposal.submitter) #TODO verify using submitter is ok
+                    proposal.reset_application_discount(
+                        proposal.submitter
+                    )  # TODO verify using submitter is ok
                 else:
-                    logger.error(
-                        "Invoice payment status is {}".format(inv.payment_status)
+                    logger.error(f"Invoice payment status is {inv.payment_status}")
+                    raise serializers.ValidationError(
+                        f"Invoice payment status is {inv.payment_status}"
                     )
-                    raise serializers.ValidationError("Invoice payment status is {}".format(inv.payment_status))
-            except Exception as e:
-                print(e)
-                raise serializers.ValidationError("Fee success preload failed")
-            
+            except Exception:
+                msg = "Fee success preload failed"
+                logger.exception(msg)
+                raise serializers.ValidationError(msg)
+
             if success:
                 filming_fee.save()
 
         return Response(status=status.HTTP_200_OK)
 
+
 class FilmingFeeSuccessView(TemplateView):
     template_name = "commercialoperator/booking/success_fee.html"
 
     def get(self, request, *args, **kwargs):
-        print("FilmingFeeSuccessView")
+        logger.debug("FilmingFeeSuccessView")
         lodgement_number = kwargs.get("reference")
 
         try:
             proposal = Proposal.objects.get(lodgement_number=lodgement_number)
-        except:
+        except Proposal.DoesNotExist:
             raise serializers.ValidationError("Proposal does not exist")
-        
+
         user = request.user
-        try:
-            user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
-            if not (
-                is_internal(self.request) or
-                proposal.org_applicant in user_orgs or proposal.submitter == user
-            ):
-                raise PermissionDenied
-        except:
-            raise
+
+        user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
+        if not (
+            is_internal(self.request)
+            or proposal.org_applicant in user_orgs
+            or proposal.submitter == user
+        ):
+            raise PermissionDenied
 
         filming_fee = get_session_filming_invoice(request.session)
         fee_inv = filming_fee.filming_fee_invoices.order_by("-id").first()
         invoice_ref = fee_inv.invoice_reference
 
-        #TODO review all instances of fee success "submitter" being set - 
+        # TODO review all instances of fee success "submitter" being set -
         # check the template and check if the information is accurate RE emails sent and to where
-        applicant = proposal.applicant_obj
-        try:
-            if applicant.email:
-                submitter = applicant.email
-            else:
-                submitter = proposal.submitter.email if proposal and proposal.submitter else None
-        except:
-            submitter = proposal.submitter.email if proposal and proposal.submitter else None
+        applicant = getattr(proposal, "applicant_obj", None)
+        submitter = None
+
+        if applicant and getattr(applicant, "email", None):
+            submitter = applicant.email
+        elif proposal and getattr(proposal, "submitter", None):
+            submitter = proposal.submitter.email
 
         try:
             inv = Invoice.objects.get(reference=invoice_ref)
-        except:
+        except Invoice.DoesNotExist:
+            logger.warning(
+                f"Invoice instance with reference '{invoice_ref}' does not exist"
+            )
             inv = None
 
         context = {"proposal": proposal, "submitter": submitter, "fee_invoice": inv}
@@ -709,22 +743,24 @@ class FilmingFeeSuccessView(TemplateView):
 
 
 class ApplicationFeeSuccessViewPreload(views.APIView):
-    permission_classes = [AllowAny] 
+    permission_classes = (AllowAny,)
 
     def get(self, request, reference, format=None):
-        print("ApplicationFeeSuccessViewPreload")
+        logger.debug("ApplicationFeeSuccessViewPreload")
 
-        invoice_ref = request.GET.get('invoice')
+        invoice_ref = request.GET.get("invoice")
 
         try:
             proposal = Proposal.objects.get(lodgement_number=reference)
-            print("proposal:",proposal)
-        except Exception as e:
-            print(e)
-            return redirect('home')
-        
-        #use the latest Fee record
-        proposal_fee = ApplicationFee.objects.filter(proposal=proposal).order_by("created").last()
+            logger.debug(f"proposal:{proposal}")
+        except Exception:
+            logger.exception()
+            return redirect("home")
+
+        # use the latest Fee record
+        proposal_fee = (
+            ApplicationFee.objects.filter(proposal=proposal).order_by("created").last()
+        )
 
         _, _ = ApplicationFeeInvoice.objects.get_or_create(
             application_fee=proposal_fee, invoice_reference=invoice_ref
@@ -748,31 +784,35 @@ class ApplicationFeeSuccessViewPreload(views.APIView):
                     proposal.reset_application_discount(proposal.submitter)
                     success = True
                 else:
-                    logger.error(
-                        "Invoice payment status is {}".format(payment_status)
+                    logger.error(f"Invoice payment status is {payment_status}")
+                    raise serializers.ValidationError(
+                        f"Invoice payment status is {payment_status}"
                     )
-                    raise serializers.ValidationError("Invoice payment status is {}".format(payment_status))
 
-            except Exception as e:
-                print(e)
-                raise serializers.ValidationError("Fee success preload failed")
+            except Exception:
+                msg = "Fee success preload failed"
+                logger.exception(msg)
+                raise serializers.ValidationError(msg)
 
             if success:
                 proposal_fee.save()
                 applicant = proposal.applicant_obj
                 try:
                     recipient = Organisation.objects.get(id=applicant.id).email
-                except:
+                except Organisation.DoesNotExist:
                     recipient = proposal.submitter.email
-                
+
                 try:
-                    #NOTE: request=None works fine with this email function
+                    # NOTE: request=None works fine with this email function
                     send_application_fee_invoice_tclass_email_notification(
                         request, proposal, inv, recipients=[recipient]
                     )
-                except:
-                    #log the error but do not invalidate the payment and subsequent compliance submission
-                    logger.error("Unable to send compliance fee invoice email notification")
+                except Exception as e:
+                    # log the error but do not invalidate the payment and subsequent compliance submission
+                    logger.exception(
+                        "Unable to send compliance fee invoice email notification",
+                        exc_info=e,  # 2. Explicitly pass it to the logger
+                    )
 
         return Response(status=status.HTTP_200_OK)
 
@@ -781,44 +821,45 @@ class ApplicationFeeSuccessView(TemplateView):
     template_name = "commercialoperator/booking/success_fee.html"
 
     def get(self, request, *args, **kwargs):
-        print("ApplicationFeeSuccessView")
+        logger.debug("ApplicationFeeSuccessView")
         lodgement_number = kwargs.get("reference")
 
         try:
             proposal = Proposal.objects.get(lodgement_number=lodgement_number)
-        except:
+        except Proposal.DoesNotExist:
             raise serializers.ValidationError("Proposal does not exist")
 
         user = request.user
-        try:
-            user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
-            if not (
-                is_internal(self.request) or
-                proposal.org_applicant in user_orgs or proposal.submitter == user
-            ):
-                raise PermissionDenied
-        except:
-            raise
-        
+
+        user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
+        if not (
+            is_internal(self.request)
+            or proposal.org_applicant in user_orgs
+            or proposal.submitter == user
+        ):
+            raise PermissionDenied
+
         application_fee = get_session_application_invoice(request.session)
 
         fee_inv = application_fee.application_fee_invoices.order_by("-id").first()
         invoice_ref = fee_inv.invoice_reference
 
-        #TODO review all instances of fee success "submitter" being set - 
+        # TODO review all instances of fee success "submitter" being set -
         # check the template and check if the information is accurate RE emails sent and to where
-        applicant = proposal.applicant_obj
-        try:
-            if applicant.email:
-                submitter = applicant.email
-            else:
-                submitter = proposal.submitter.email if proposal and proposal.submitter else None
-        except:
-            submitter = proposal.submitter.email if proposal and proposal.submitter else None
+        applicant = getattr(proposal, "applicant_obj", None)
+        submitter = None
+
+        if applicant and getattr(applicant, "email", None):
+            submitter = applicant.email
+        elif proposal and getattr(proposal, "submitter", None):
+            submitter = proposal.submitter.email
 
         try:
             inv = Invoice.objects.get(reference=invoice_ref)
-        except:
+        except Invoice.DoesNotExist:
+            logger.warning(
+                f"Invoice instance with reference '{invoice_ref}' does not exist"
+            )
             inv = None
 
         context = {"proposal": proposal, "submitter": submitter, "fee_invoice": inv}
@@ -826,42 +867,42 @@ class ApplicationFeeSuccessView(TemplateView):
 
 
 class BookingSuccessViewPreload(views.APIView):
-    permission_classes = [AllowAny] 
+    permission_classes = (AllowAny,)
 
     def get(self, request, reference, format=None):
-        print("BookingSuccessViewPreload")
+        logger.debug("BookingSuccessViewPreload")
 
-        invoice_ref = request.GET.get('invoice')
+        invoice_ref = request.GET.get("invoice")
 
         try:
             proposal = Proposal.objects.get(lodgement_number=reference)
-            print("proposal:",proposal)
-        except Exception as e:
-            print(e)
-            return redirect('home')
+            logger.debug(f"proposal: {proposal}")
+        except Exception:
+            logger.exception()
+            return redirect("home")
 
-        #use the latest Fee record
+        # use the latest Fee record
         booking = Booking.objects.filter(proposal=proposal).order_by("created").last()
 
         _, created = BookingInvoice.objects.get_or_create(
             booking=booking,
             invoice_reference=invoice_ref,
-            payment_method=Invoice.PAYMENT_METHOD_CC, #if we are here, it was paid by credit_card
+            payment_method=Invoice.PAYMENT_METHOD_CC,  # if we are here, it was paid by credit_card
         )
 
         if created:
-            try:
-                logger.info(
-                    "{} Created Park Bookings Invoice {} for Booking ID {}".format(
-                        "User {} with id {}".format(
-                            proposal.submitter.get_full_name(), proposal.submitter.id
-                        ),
-                        invoice_ref,
-                        booking.id,
-                    )
-                )
-            except:
-                logger.error("Unable to log booking invoice creation")
+            submitter = getattr(proposal, "submitter", None)
+
+            if submitter:
+                user_info = f"User {submitter.get_full_name()} with id {submitter.id}"
+            else:
+                user_info = "System/Unknown User"
+
+            booking_id = getattr(booking, "id", "Unknown")
+
+            logger.info(
+                f"{user_info} Created Park Bookings Invoice {invoice_ref} for Booking ID {booking_id}"
+            )
 
         if booking.booking_type == Booking.BOOKING_TYPE_TEMPORARY:
             booking.booking_type = Booking.BOOKING_TYPE_INTERNET
@@ -877,32 +918,46 @@ class BookingSuccessViewPreload(views.APIView):
                 if payment_status == "paid" or payment_status == "over_paid":
                     success = True
                 else:
-                    logger.error(
-                        "Invoice payment status is {}".format(payment_status)
+                    logger.error(f"Invoice payment status is {payment_status}")
+                    raise serializers.ValidationError(
+                        f"Invoice payment status is {payment_status}"
                     )
-                    raise serializers.ValidationError("Invoice payment status is {}".format(payment_status))
 
-            except Exception as e:
-                print(e)
+            except Exception:
+                msg = "Fee success preload failed"
+                logger.exception(msg)
                 raise serializers.ValidationError("Fee success preload failed")
 
             if success:
                 booking.save()
-                recipients = []
 
-                try:
-                    recipients.append(proposal.applicant.email)
-                except:
-                    if proposal.submitter and proposal.submitter.email:
-                        recipients.append(proposal.submitter.email)
+                applicant_email = getattr(
+                    getattr(proposal, "applicant", None), "email", None
+                )
+                submitter_email = getattr(
+                    getattr(proposal, "submitter", None), "email", None
+                )
+
+                recipients = []
+                if applicant_email:
+                    recipients.append(applicant_email)
+                elif submitter_email:
+                    recipients.append(submitter_email)
 
                 if recipients:
-                    #TODO using submitter instead of request user as sender but ideally sender should be the system in all cases (tbd)
+                    submitter_user = getattr(proposal, "submitter", None)
+
                     send_invoice_tclass_email_notification(
-                        proposal.submitter, booking, inv, recipients=recipients
+                        submitter_user, booking, inv, recipients=recipients
                     )
                     send_confirmation_tclass_email_notification(
-                        proposal.submitter, booking, inv, recipients=recipients
+                        submitter_user, booking, inv, recipients=recipients
+                    )
+                else:
+                    # Critical safety log: Always log if a customer didn't get their invoice..
+                    logger.error(
+                        f"Booking {booking.id} saved successfully, but no recipient email "
+                        f"could be found on proposal {proposal.id}. Notifications were NOT sent."
                     )
 
         return Response(status=status.HTTP_200_OK)
@@ -912,24 +967,23 @@ class BookingSuccessView(TemplateView):
     template_name = "commercialoperator/booking/success.html"
 
     def get(self, request, *args, **kwargs):
-        print("BookingSuccessView")
+        logger.debug("BookingSuccessView")
         lodgement_number = kwargs.get("reference")
 
         try:
             proposal = Proposal.objects.get(lodgement_number=lodgement_number)
-        except:
+        except Proposal.DoesNotExist:
             raise serializers.ValidationError("Proposal does not exist")
-        
+
         user = request.user
-        try:
-            user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
-            if not (
-                is_internal(self.request) or
-                proposal.org_applicant in user_orgs or proposal.submitter == user
-            ):
-                raise PermissionDenied
-        except:
-            raise
+
+        user_orgs = [org.id for org in user.commercialoperator_organisations.all()]
+        if not (
+            is_internal(self.request)
+            or proposal.org_applicant in user_orgs
+            or proposal.submitter == user
+        ):
+            raise PermissionDenied
 
         booking = Booking.objects.filter(proposal=proposal).order_by("created").last()
         session_booking = get_session_booking(request.session)
@@ -937,26 +991,30 @@ class BookingSuccessView(TemplateView):
         if booking != session_booking:
             logger.warning("Latest booking record and booking in session do not match")
 
-        #TODO review all instances of fee success "submitter" being set - 
+        # TODO review all instances of fee success "submitter" being set -
         # check the template and check if the information is accurate RE emails sent and to where
-        applicant = proposal.applicant_obj
-        try:
-            if applicant.email:
-                submitter = applicant.email
-            else:
-                submitter = proposal.submitter.email if proposal and proposal.submitter else None
-        except:
-            submitter = proposal.submitter.email if proposal and proposal.submitter else None
+        applicant = getattr(proposal, "applicant_obj", None)
+        submitter = None
+
+        if applicant and getattr(applicant, "email", None):
+            submitter = applicant.email
+        elif proposal and getattr(proposal, "submitter", None):
+            submitter = proposal.submitter.email
 
         fee_inv = booking.invoices.order_by("-id").first()
         invoice_ref = fee_inv.invoice_reference
 
         try:
             inv = Invoice.objects.get(reference=invoice_ref)
-        except:
+        except Invoice.DoesNotExist:
             inv = None
 
-        context = {"booking_id": booking.id, "submitter": submitter, "payer": request.user, "invoice_reference": inv.reference if inv else None}
+        context = {
+            "booking_id": booking.id,
+            "submitter": submitter,
+            "payer": request.user,
+            "invoice_reference": inv.reference if inv else None,
+        }
         return render(request, self.template_name, context)
 
 
@@ -1036,7 +1094,9 @@ class InvoiceCompliancePDFView(View):
 
         compliance = cfi.compliance_fee.compliance
 
-        organisation = compliance.proposal.org_applicant if compliance.proposal else None
+        organisation = (
+            compliance.proposal.org_applicant if compliance.proposal else None
+        )
         if self.check_owner(organisation):
             response = HttpResponse(content_type="application/pdf")
 
@@ -1208,18 +1268,12 @@ class SessionAbortRedirectView(TemplateView):
         context = None
         action = request.GET.get("action", None)
 
-        try:
-            booking = get_session_booking(request.session)
+        booking = get_session_booking(request.session)
 
-            # only ever delete a booking object if it's marked as temporary
-            if booking.booking_type == 3:
-                booking.delete()
-            delete_session_booking(request.session)
+        if booking and getattr(booking, "booking_type", None) == 3:
+            booking.delete()
 
-        except Exception as e:
-            logger.warning("Error deleting session booking: {}".format(e))
-        else:
-            pass
+        delete_session_booking(request.session)
 
         if action == "quit":
             # if the user wants to quit, we redirect to the home page
