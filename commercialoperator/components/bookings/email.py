@@ -1,17 +1,25 @@
+#!/usr/bin/env python
+
 import logging
 
-from django.core.mail import EmailMultiAlternatives, EmailMessage
-from django.utils.encoding import smart_str as smart_text
 from django.conf import settings
+from django.core.mail import EmailMessage, EmailMultiAlternatives
+from django.utils.encoding import smart_str as smart_text
 
-from commercialoperator.components.emails.emails import TemplateEmailBase
 from commercialoperator.components.bookings.confirmation_pdf import (
     create_confirmation_pdf_bytes,
 )
+from commercialoperator.components.bookings.invoice_compliance_pdf import (
+    create_invoice_compliance_pdf_bytes,
+)
+from commercialoperator.components.bookings.models import Booking
 from commercialoperator.components.bookings.monthly_confirmation_pdf import (
     create_monthly_confirmation_pdf_bytes,
 )
-from commercialoperator.components.bookings.models import Booking
+from commercialoperator.components.emails.emails import TemplateEmailBase
+from commercialoperator.components.proposals.email import (
+    ProposalApprovalSendNotificationEmail,
+)
 from commercialoperator.components.segregation.utils import retrieve_email_user_by_email
 
 logger = logging.getLogger(__name__)
@@ -25,12 +33,6 @@ class ComplianceFeeInvoiceEventsSendNotificationEmail(TemplateEmailBase):
     txt_template = (
         "commercialoperator/emails/bookings/events/send_compliance_fee_notification.txt"
     )
-
-
-# class ApplicationAwaitingPaymentInvoiceFilmingSendNotificationEmail(TemplateEmailBase):
-#    subject = 'Your filming fee awaiting payment invoice.'
-#    html_template = 'commercialoperator/emails/bookings/filming/send_filming_fee_awaiting_payment_notification.html'
-#    txt_template = 'commercialoperator/emails/bookings/filmig/send_filming_fee_awaiting_payment_notification.txt'
 
 
 class ApplicationInvoiceFilmingSendNotificationEmail(TemplateEmailBase):
@@ -109,31 +111,6 @@ class PaymentDueNotificationFailedTClassEmail(TemplateEmailBase):
     txt_template = "commercialoperator/emails/bookings/tclass/send_external_payment_due_notification_failed.txt"
 
 
-# def send_application_awaiting_payment_invoice_filming_email_notification(request, proposal, recipients, is_test=False):
-#    email = ApplicationAwaitingPaymentInvoiceFilmingSendNotificationEmail()
-#    #url = request.build_absolute_uri(reverse('external-proposal-detail',kwargs={'proposal_pk': proposal.id}))
-#
-#    context = {
-#        'proposal_lodgement_number': proposal.lodgement_number,
-#        #'url': url,
-#    }
-#
-#    filename = 'awaiting_payment_invoice.pdf'
-#    doc = create_awaiting_payment_invoice_pdf_bytes(filename, proposal)
-#    attachment = (filename, doc, 'application/pdf')
-#
-#    msg = email.send(recipients, attachments=[attachment], context=context)
-#    if is_test:
-#        return
-#
-#    sender = request.user if request else settings.DEFAULT_FROM_EMAIL
-#    _log_proposal_email(msg, proposal, sender=sender)
-#    if proposal.org_applicant:
-#        _log_org_email(msg, proposal.org_applicant, proposal.submitter, sender=sender)
-#    else:
-#        _log_user_email(msg, proposal.submitter, proposal.submitter, sender=sender)
-
-
 def send_application_invoice_filming_email_notification(
     request, proposal, invoice, recipients, is_test=False
 ):
@@ -169,12 +146,10 @@ def send_compliance_fee_invoice_events_email_notification(
     request, compliance, invoice, recipients, is_test=False
 ):
     email = ComplianceFeeInvoiceEventsSendNotificationEmail()
-    # url = request.build_absolute_uri(reverse('external-proposal-detail',kwargs={'proposal_pk': proposal.id}))
 
     context = {
-        "proposal_lodgement_number": proposal.lodgement_number,
+        "proposal_lodgement_number": compliance.proposal.lodgement_number,
         "compliance_lodgement_number": compliance.lodgement_number,
-        #'url': url,
     }
 
     filename = "invoice.pdf"
@@ -190,7 +165,7 @@ def send_compliance_fee_invoice_events_email_notification(
         if request
         else retrieve_email_user_by_email(settings.DEFAULT_FROM_EMAIL)
     )
-    _log_proposal_email(msg, proposal, sender=sender)
+    _log_proposal_email(msg, compliance.proposal, sender=sender)
     if compliance.proposal.org_applicant:
         _log_org_email(
             msg, compliance.proposal.org_applicant, compliance.submitter, sender=sender
@@ -236,12 +211,10 @@ def send_application_fee_confirmation_tclass_email_notification(
     request, application_fee, invoice, recipients, is_test=False
 ):
     email = ApplicationFeeConfirmationTClassSendNotificationEmail()
-    # url = request.build_absolute_uri(reverse('external-proposal-detail',kwargs={'proposal_pk': proposal.id}))
 
     proposal = application_fee.proposal
     context = {
         "lodgement_number": proposal.lodgement_number,
-        #'url': url,
     }
 
     filename = "confirmation.pdf"
@@ -264,7 +237,7 @@ def send_application_fee_confirmation_tclass_email_notification(
         _log_user_email(msg, proposal.submitter, proposal.submitter, sender=sender)
 
 
-#TODO default sender should be no-reply - consider refactoring all email functions to not use the request user email 
+# TODO default sender should be no-reply - consider refactoring all email functions to not use the request user email
 def send_invoice_tclass_email_notification(
     sender, booking, invoice, recipients, is_test=False
 ):
@@ -360,7 +333,6 @@ def send_proposal_approval_email_notification(proposal, request):
         else retrieve_email_user_by_email(settings.DEFAULT_FROM_EMAIL)
     )
     _log_proposal_email(msg, proposal, sender=sender)
-    # _log_org_email(msg, proposal.applicant, proposal.submitter, sender=sender)
     if proposal.org_applicant:
         _log_org_email(msg, proposal.org_applicant, proposal.submitter, sender=sender)
     else:
@@ -448,7 +420,7 @@ def send_monthly_invoices_failed_tclass(booking_ids):
             "proposal_org_applicant_organisation_organisation_name",
         ),
     }
-    msg = email.send(settings.NOTIFICATION_EMAIL, context=context)
+    email.send(settings.NOTIFICATION_EMAIL, context=context)
 
 
 def send_payment_due_notification_failed_tclass(bookings):
@@ -456,25 +428,7 @@ def send_payment_due_notification_failed_tclass(bookings):
     email = PaymentDueNotificationFailedTClassEmail()
 
     context = {"bookings": bookings}
-    msg = email.send(settings.NOTIFICATION_EMAIL, context=context)
-
-
-def send_invoice_payment_due_tclass_email_notification(
-    sender, bookings, recipients, is_test=False
-):
-    email = SendPaymentDueNotificationTClassEmail()
-
-    context = {
-        "bookings": bookings,
-    }
-
-    msg = email.send(booking.proposal.proposal_submitter_email, context=context)
-    # sender = sender if sender else settings.DEFAULT_FROM_EMAIL
-    # _log_proposal_email(msg, booking.proposal, sender=sender)
-    # if booking.proposal.org_applicant:
-    #    _log_org_email(msg, booking.proposal.org_applicant, booking.proposal.submitter, sender=sender)
-    # else:
-    #    _log_user_email(msg, booking.proposal.submitter, booking.proposal.submitter, sender=sender)
+    email.send(settings.NOTIFICATION_EMAIL, context=context)
 
 
 def send_invoice_payment_due_tclass_external_email_notification(
@@ -588,8 +542,6 @@ def _log_org_email(email_message, organisation, customer, sender=None):
         fromm = smart_text(sender) if sender else SYSTEM_NAME
         all_ccs = ""
 
-    customer = customer
-
     staff = sender
 
     kwargs = {
@@ -640,8 +592,6 @@ def _log_user_email(email_message, emailuser, customer, sender=None):
         to = customer
         fromm = smart_text(sender) if sender else SYSTEM_NAME
         all_ccs = ""
-
-    customer = customer
 
     staff = sender
 
