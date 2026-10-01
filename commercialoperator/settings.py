@@ -1,9 +1,9 @@
-from django.core.exceptions import ImproperlyConfigured
+import hashlib
+import logging
+import os
 
-import os, hashlib
 import confy
 from confy import env
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -12,10 +12,10 @@ if os.path.exists(BASE_DIR + "/.env"):
     confy.read_environment_file(BASE_DIR + "/.env")
 os.environ.setdefault("BASE_DIR", BASE_DIR)
 
-from ledger_api_client.settings_base import *  # noqa: F403
+from ledger_api_client.settings_base import *
 
 ROOT_URLCONF = "commercialoperator.urls"
-COMMERCIALOPERATOR_EXTERNAL_URL=env("COMMERCIALOPERATOR_EXTERNAL_URL","")
+COMMERCIALOPERATOR_EXTERNAL_URL = env("COMMERCIALOPERATOR_EXTERNAL_URL", "")
 SITE_ID = 1
 DEPT_DOMAINS = env("DEPT_DOMAINS", ["dpaw.wa.gov.au", "dbca.wa.gov.au"])
 SYSTEM_MAINTENANCE_WARNING = env("SYSTEM_MAINTENANCE_WARNING", 24)  # hours
@@ -23,11 +23,11 @@ SHOW_TESTS_URL = env("SHOW_TESTS_URL", False)
 SHOW_DEBUG_TOOLBAR = env("SHOW_DEBUG_TOOLBAR", False)
 
 FILE_UPLOAD_PERMISSIONS = None
-PRIVATE_MEDIA_DIR_NAME = env('PRIVATE_MEDIA_DIR_NAME', 'private-media')
+PRIVATE_MEDIA_DIR_NAME = env("PRIVATE_MEDIA_DIR_NAME", "private-media")
 PRIVATE_MEDIA_STORAGE_LOCATION = os.path.join(BASE_DIR, PRIVATE_MEDIA_DIR_NAME)
-PRIVATE_MEDIA_BASE_URL = f'/{PRIVATE_MEDIA_DIR_NAME}/'
-SESSION_ENGINE = 'django.contrib.sessions.backends.file'
-SESSION_FILE_PATH = env('SESSION_FILE_PATH', default='/app/session_store/')
+PRIVATE_MEDIA_BASE_URL = f"/{PRIVATE_MEDIA_DIR_NAME}/"
+SESSION_ENGINE = "django.contrib.sessions.backends.file"
+SESSION_FILE_PATH = env("SESSION_FILE_PATH", default="/app/session_store/")
 
 BUILD_TAG = env(
     "BUILD_TAG", hashlib.md5(os.urandom(32)).hexdigest()
@@ -38,8 +38,8 @@ if env("CONSOLE_EMAIL_BACKEND", False):
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 SHOW_ROOT_API = env("SHOW_ROOT_API", False)
-SESSION_COOKIE_SECURE = env('SESSION_COOKIE_SECURE', True)
-CSRF_COOKIE_SECURE = env('CSRF_COOKIE_SECURE', True)
+SESSION_COOKIE_SECURE = env("SESSION_COOKIE_SECURE", True)
+CSRF_COOKIE_SECURE = env("CSRF_COOKIE_SECURE", True)
 
 TEMPLATE_TITLE = "Commercial Operator Licensing"
 TEMPLATE_HEADER_LOGO = "/static/commercialoperator/img/logo-park-stay-trunc.gif"
@@ -53,12 +53,8 @@ GEOS_LIBRARY_PATH = os.environ.get(
     "GEOS_LIBRARY_PATH",
 )
 # Use git commit hash for purging cache in browser for deployment changes
-GIT_COMMIT_HASH = os.popen(
-    f"cd {BASE_DIR}; git log -1 --format=%H"
-).read()  # noqa: S605
-GIT_COMMIT_DATE = os.popen(
-    f"cd {BASE_DIR}; git log -1 --format=%cd"
-).read()  # noqa: S605
+GIT_COMMIT_HASH = os.popen(f"cd {BASE_DIR}; git log -1 --format=%H").read()
+GIT_COMMIT_DATE = os.popen(f"cd {BASE_DIR}; git log -1 --format=%cd").read()
 if len(GIT_COMMIT_HASH) == 0:
     GIT_COMMIT_HASH = os.popen("cat /app/git_hash").read()
     if len(GIT_COMMIT_HASH) == 0:
@@ -110,7 +106,7 @@ INSTALLED_APPS += [
     "multiselectfield",
     "appmonitor_client",
     "django_vite",
-    'wagov_utils.components.sri_utils',
+    "wagov_utils.components.sri_utils",
 ]
 
 # Not using django cron
@@ -128,8 +124,8 @@ REST_FRAMEWORK = {
         "rest_framework_datatables.renderers.DatatablesRenderer",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,
 }
 
 
@@ -175,7 +171,7 @@ else:
 
 CACHE_TIMEOUT_2_HOURS = 60 * 60 * 2
 CACHE_KEY_FILE_EXTENSION_WHITELIST = "file-extension-whitelist"
-FILE_SIZE_LIMIT_BYTES = env('FILE_SIZE_LIMIT_BYTES' ,128000000)
+FILE_SIZE_LIMIT_BYTES = env("FILE_SIZE_LIMIT_BYTES", 128000000)
 
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 MEDIA_URL = "/media/"
@@ -184,7 +180,9 @@ STATICFILES_DIRS.append(
     os.path.join(os.path.join(BASE_DIR, "commercialoperator", "static"))
 )
 STATICFILES_DIRS.append(
-  os.path.join(os.path.join(BASE_DIR, "commercialoperator", "static", "commercialoperator_vue"))
+    os.path.join(
+        os.path.join(BASE_DIR, "commercialoperator", "static", "commercialoperator_vue")
+    )
 )
 
 DATA_UPLOAD_MAX_NUMBER_FIELDS = None
@@ -299,27 +297,33 @@ LOGGING["loggers"]["payment_checkout"] = {
 LOGGING["loggers"]["commercialoperator"] = {"handlers": ["file"], "level": "INFO"}
 
 if DEBUG:
-    LOGGING["formatters"] = {
-        "verbose": {
-            "format": "%(levelname)s %(asctime)s %(name)s [Line:%(lineno)s][%(funcName)s] %(message)s"
-        },
-        "simple": {
-            "format": "[Line:%(lineno)s][%(funcName)s] %(levelname)s %(message)s"
-        },
+    LOGGING["formatters"]["verbose"] = {
+        "format": "%(levelname)s %(asctime)s %(name)s [Line:%(lineno)s][%(funcName)s] %(message)s"
     }
-    LOGGING["handlers"]["console"] = {
-        "level": "DEBUG",
-        "class": "logging.StreamHandler",
-        "formatter": "verbose",
+    LOGGING["formatters"]["simple"] = {
+        "format": "[Line:%(lineno)s][%(funcName)s] %(levelname)s %(message)s"
     }
+
+    LOGGING["handlers"]["console"]["level"] = "DEBUG"
+    LOGGING["handlers"]["console"]["formatter"] = "verbose"
+
     LOGGING["loggers"]["commercialoperator"] = {
         "handlers": ["console"],
         "level": "DEBUG",
-        "formatter": "verbose",
         "propagate": False,
     }
 
-    # Get rid of the annoying asyncio info log message
+    LOGGING["loggers"][""] = {
+        "handlers": ["console"],
+        "level": "DEBUG",
+    }
+
+    LOGGING["loggers"]["django.server"] = {
+        "handlers": ["console"],
+        "level": "DEBUG",
+        "propagate": False,
+    }
+
     LOGGING["loggers"]["asyncio"] = {
         "level": "WARNING",
     }
@@ -373,36 +377,50 @@ CSRF_TRUSTED_ORIGINS = json.loads(str(CSRF_TRUSTED_ORIGINS_STRING))
 ORGANISATION_PERMISSION_MODULE = "commercialoperator.components.permission.permission"
 
 LEDGER_UI_ORGANISATION_MANAGEMENT = [
-        {'organisation_name': {'options' : {'view': True, 'edit': True}}},
-        {'organisation_abn': {'options' : {'view': True, 'edit': True}}},
-        {'organisation_trading_name': {'options' : {'view': True, 'edit': True}}},
-        {'organisation_email': {'options' : {'view': True, 'edit': True}}},
-        {'billing_address': {'options' : {'view': True, 'edit': True}}},
-        {'postal_address': {'options' : {'view': True, 'edit': True}}}
+    {"organisation_name": {"options": {"view": True, "edit": True}}},
+    {"organisation_abn": {"options": {"view": True, "edit": True}}},
+    {"organisation_trading_name": {"options": {"view": True, "edit": True}}},
+    {"organisation_email": {"options": {"view": True, "edit": True}}},
+    {"billing_address": {"options": {"view": True, "edit": True}}},
+    {"postal_address": {"options": {"view": True, "edit": True}}},
 ]
 
 DJANGO_VITE_DEV_MODE = env("DJANGO_VITE_DEV_MODE", False)
 if DEBUG and not DJANGO_VITE_DEV_MODE:
-    print("\nServer running in DEBUG mode, frontend hot module reloading is OFF. Set env var DJANGO_VITE_DEV_MODE to True to enable hot module reloading.\n")
+    print(
+        "\nServer running in DEBUG mode, frontend hot module reloading is OFF. Set env var DJANGO_VITE_DEV_MODE to True to enable hot module reloading.\n"
+    )
 else:
-    print("\nServer running in DEBUG mode, frontend hot module reloading is ON. Set env var DJANGO_VITE_DEV_MODE to False to disable hot module reloading.\n")
+    print(
+        "\nServer running in DEBUG mode, frontend hot module reloading is ON. Set env var DJANGO_VITE_DEV_MODE to False to disable hot module reloading.\n"
+    )
 
-STATIC_URL_PREFIX = "/static/commercialoperator_vue/" if DJANGO_VITE_DEV_MODE else "commercialoperator_vue/"
+STATIC_URL_PREFIX = (
+    "/static/commercialoperator_vue/"
+    if DJANGO_VITE_DEV_MODE
+    else "commercialoperator_vue/"
+)
 
 DJANGO_VITE = {
-  "default": {
-    "dev_mode": DJANGO_VITE_DEV_MODE,
-    "manifest_path": os.path.join(
-        BASE_DIR, "commercialoperator", "static", "commercialoperator_vue", "manifest.json"
-    ),
-    "dev_server_host": "localhost", # Default host for vite (can change if needed)
-    "dev_server_port": env("DJANGO_VITE_DEV_SERVER_PORT", 5173), # Default port for vite (can change if needed)
-    "static_url_prefix": STATIC_URL_PREFIX,
-  }
+    "default": {
+        "dev_mode": DJANGO_VITE_DEV_MODE,
+        "manifest_path": os.path.join(
+            BASE_DIR,
+            "commercialoperator",
+            "static",
+            "commercialoperator_vue",
+            "manifest.json",
+        ),
+        "dev_server_host": "localhost",  # Default host for vite (can change if needed)
+        "dev_server_port": env(
+            "DJANGO_VITE_DEV_SERVER_PORT", 5173
+        ),  # Default port for vite (can change if needed)
+        "static_url_prefix": STATIC_URL_PREFIX,
+    }
 }
 
 
 VUE3_ENTRY_SCRIPT = env(
-  "VUE3_ENTRY_SCRIPT",
-  default="src/main.js", # This path will be auto prefixed with the       static_url_prefix from DJANGO_VITE above
-) # Path of the vue3 entry point script served by vite
+    "VUE3_ENTRY_SCRIPT",
+    default="src/main.js",  # This path will be auto prefixed with the       static_url_prefix from DJANGO_VITE above
+)  # Path of the vue3 entry point script served by vite
