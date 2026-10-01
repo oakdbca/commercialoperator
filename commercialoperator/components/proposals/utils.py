@@ -128,7 +128,7 @@ def _create_data_from_item(item, post_data, file_data, repetition, suffix):
         raise Exception("Missing name in item %s" % item["label"])
 
     if "children" not in item:
-        if item["type"] in ["checkbox" "declaration"]:
+        if item["type"] in ["checkbox", "declaration"]:
             # item_data[item['name']] = post_data[item['name']]
             item_data[item["name"]] = extended_item_name in post_data
         elif item["type"] == "file":
@@ -519,7 +519,7 @@ class SpecialFieldsSearch(object):
 
         if "children" not in item:
             for f in self.lookable_fields:
-                if item["type"] in ["checkbox" "declaration"]:
+                if item["type"] in ["checkbox", "declaration"]:
                     val = None
                     val = item.get(f, None)
                     if val:
