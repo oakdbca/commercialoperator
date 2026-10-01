@@ -1,7 +1,8 @@
 #!/usr/bin/env python
-import confy
 import os
 import sys
+
+import confy
 
 dot_env = os.path.join(os.getcwd(), ".env")
 if os.path.exists(dot_env):
