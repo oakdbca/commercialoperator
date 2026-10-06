@@ -1,29 +1,32 @@
 <template id="proposal_dashboard">
     <div id="paymentDash" class="container">
-        <div
-            v-if="is_external && overdue_invoices.length > 0"
-            class="row error"
-        >
+        <div v-if="is_external && overdue_invoices.length > 0" class="row mb-3">
             <div class="col-sm-12 mb-2">
                 <div class="card">
                     <div class="card-header">
+                        <i
+                            class="bi bi-exclamation-circle-fill text-danger me-2"
+                        ></i>
                         The following invoice(s) are overdue:
                     </div>
-                    <div class="card card-body bg-light p-2">
-                        <div class="card-text">
-                            <div
-                                v-for="invoice in overdue_invoices"
-                                :key="invoice.id"
-                            >
-                                {{ invoice.invoice_reference }}
-                            </div>
+                    <div class="card-body p-2">
+                        <div class="card-text w-50">
+                            <ul class="list-group d-inline-block">
+                                <li
+                                    v-for="invoice in overdue_invoices"
+                                    :key="invoice.id"
+                                    class="list-group-item list-group-item-danger m-2"
+                                >
+                                    {{ invoice.invoice_reference }}
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="row">
+        <div class="row mb-3">
             <div class="col-sm-12">
                 <div v-if="is_external" class="card mb-2">
                     <div class="card-header">Park Entry Fees</div>
@@ -40,6 +43,10 @@
                         </p>
                     </div>
                 </div>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-sm-12">
                 <FormSection
                     :form-collapse="false"
                     label="Park Entry Fees"
@@ -52,12 +59,14 @@
                                 id="select_park_entry_fees_parks_parent"
                                 class="form-group"
                             >
-                                <label for="select_park_entry_fees_parks">Park</label>
+                                <label for="select_park_entry_fees_parks"
+                                    >Park</label
+                                >
                                 <select
                                     id="select_park_entry_fees_parks"
                                     ref="select_park_entry_fees_parks"
                                     v-model="filterProposalPark"
-                                    class="form-control"
+                                    class="form-select"
                                 >
                                     <option value="All">All</option>
                                     <option
@@ -82,7 +91,7 @@
                                     id="select_park_entry_fees_status"
                                     ref="select_park_entry_fees_status"
                                     v-model="filterProposalStatus"
-                                    class="form-control"
+                                    class="form-select"
                                 >
                                     <option value="All">All</option>
                                     <option
@@ -108,7 +117,7 @@
                                     id="select_park_entry_fees_payment_method"
                                     ref="select_park_entry_fees_payment_method"
                                     v-model="filterProposalPaymentMethod"
-                                    class="form-control"
+                                    class="form-select"
                                 >
                                     <option value="All">All</option>
                                     <option
@@ -162,7 +171,6 @@
                                 </div>
                             </div>
                         </div>
-
                     </div>
 
                     <div class="row mb-3 justify-content-end">
@@ -199,7 +207,7 @@ import datatable from '@/utils/vue/datatable.vue';
 import { api_endpoints, constants, helpers } from '@/utils/hooks';
 import { v4 as uuid } from 'uuid';
 import _ from 'lodash';
-import $ from 'jquery'
+import $ from 'jquery';
 export default {
     name: 'ProposalTableDash',
     components: {
@@ -463,7 +471,10 @@ export default {
                                         'over_paid'
                                 ) {
                                     links += `<a href='/cols/payments/invoice-payment-view/${full.invoice_reference}' target='_blank'>View Payment</a><br/>`;
-                                } else if (full.payment_method.toLowerCase() == 'invoice not found') {
+                                } else if (
+                                    full.payment_method.toLowerCase() ==
+                                    'invoice not found'
+                                ) {
                                     links += ``;
                                 } else if (full.invoice_reference !== null) {
                                     links += `<a href='/cols/payments/invoice-payment-view/${full.invoice_reference}' target='_blank'>Record Payment</a><br/>`;
@@ -577,9 +588,7 @@ export default {
         $('a[data-bs-toggle="collapse"]').on('click', function () {
             var chev = $(this).children()[0];
             window.setTimeout(function () {
-                $(chev).toggleClass(
-                    'fa-chevron-down fa-chevron-up'
-                );
+                $(chev).toggleClass('fa-chevron-down fa-chevron-up');
             }, 100);
         });
         this.$nextTick(() => {
@@ -730,7 +739,8 @@ export default {
                 $select.prop('disabled', true);
             });
 
-            helpers.fetchUrl(api_endpoints.parks_all)
+            helpers
+                .fetchUrl(api_endpoints.parks_all)
                 .then((response) => {
                     let parksArray = [];
 
@@ -739,7 +749,7 @@ export default {
                     } else if (response && Array.isArray(response.data)) {
                         parksArray = response.data;
                     } else {
-                        console.warn("Unexpected response format:", response);
+                        console.warn('Unexpected response format:', response);
                         parksArray = [];
                     }
 
@@ -749,7 +759,7 @@ export default {
                     }));
                 })
                 .catch((error) => {
-                    console.error("Error fetching parks:", error);
+                    console.error('Error fetching parks:', error);
                 })
                 .finally(() => {
                     vm.$nextTick(() => {
@@ -761,7 +771,10 @@ export default {
                             'Select Park',
                             false
                         );
-                        $('#select_park_entry_fees_parks').prop('disabled', false);
+                        $('#select_park_entry_fees_parks').prop(
+                            'disabled',
+                            false
+                        );
                     });
                 });
         },

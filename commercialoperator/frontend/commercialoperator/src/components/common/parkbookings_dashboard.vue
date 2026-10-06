@@ -9,7 +9,7 @@
                     <div class="card-header">
                         The following invoice(s) are overdue:
                     </div>
-                    <div class="card card-body bg-light p-2">
+                    <div class="card-body bg-light p-2">
                         <div class="card-text">
                             <div
                                 v-for="invoice in overdue_invoices"
