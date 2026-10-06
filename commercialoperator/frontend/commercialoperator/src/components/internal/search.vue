@@ -1,291 +1,335 @@
 <template>
     <div id="internalSearch" class="container">
-        <div class="row">
+        <div class="row mb-3">
             <div class="col-sm-12">
-                    <FormSection
-                        :form-collapse="false"
-                        label="Search Organisation"
-                        index="search_organisation"
-                    >
-                        <div class="row">
-                            <form name="searchOrganisationForm">
-                                <div class="col-md-4">
-                                    <div class="form-group">
-                                        <!-- Omitting the label for being redundant information -->
-                                        <label
-                                            class="control-label"
-                                            for="Organisation"
-                                        ></label>
-
-                                        <TextFilteredOrgField
-                                            id="id_org"
-                                            :url="filtered_org_url"
-                                            name="Organisation"
-                                        />
-                                    </div>
-                                </div>
-                                <div class="col-md-12 text-center">
-                                    <input
+                <FormSection
+                    :form-collapse="false"
+                    label="Search Organisation"
+                    index="search_organisation"
+                >
+                    <div class="row my-3">
+                        <form name="searchOrganisationForm">
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <TextFilteredOrgField
+                                        id="id_org"
+                                        class="flex-grow-1"
+                                        :url="filtered_org_url"
+                                        name="Organisation"
+                                    />
+                                    <button
                                         type="button"
                                         class="btn btn-primary"
-                                        style="margin-bottom: 5px"
-                                        value="View Details"
                                         @click.prevent="viewOrgDetails"
+                                    >
+                                        View Details
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </FormSection>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-sm-12">
+                <FormSection
+                    :form-collapse="false"
+                    label="Search User"
+                    index="search_user"
+                >
+                    <div class="row my-3">
+                        <form name="searchUserForm">
+                            <div class="col-md-6">
+                                <div class="input-group">
+                                    <TextFilteredField
+                                        id="id_holder"
+                                        class="flex-grow-1"
+                                        :url="filtered_url"
+                                        name="User"
                                     />
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary"
+                                        @click.prevent="viewUserDetails"
+                                    >
+                                        View Details
+                                    </button>
                                 </div>
-                            </form>
-                        </div>
-                    </FormSection>
+                            </div>
+                        </form>
+                    </div>
+                </FormSection>
             </div>
         </div>
-        <div class="row">
+        <div class="row mb-3">
             <div class="col-sm-12">
-                    <FormSection
-                        :form-collapse="false"
-                        label="Search User"
-                        index="search_user"
-                    >
-                        <div class="row">
-                            <form name="searchUserForm">
-                                <div class="">
-                                    <div class="col-md-4">
-                                        <div class="form-group">
-                                            <!-- Omitting the label for being redundant information -->
-                                            <label
-                                                class="control-label"
-                                                for="User"
-                                            ></label>
+                <FormSection
+                    :form-collapse="false"
+                    label="Search Keywords"
+                    index="search-keywords"
+                >
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <div class="mb-3">
+                                <label
+                                    for=""
+                                    class="col-form-label col-lg-12 fs-5"
+                                    >Record Types to Search</label
+                                >
+                                <div class="form-check col">
+                                    <input
+                                        id="searchProposal"
+                                        ref="searchProposal"
+                                        v-model="searchProposal"
+                                        class="form-check-input"
+                                        name="searchProposal"
+                                        type="checkbox"
+                                    />
+                                    <label
+                                        class="form-check-label fw-normal"
+                                        for="searchProposal"
+                                        >Application</label
+                                    >
+                                </div>
+                                <div class="form-check col">
+                                    <input
+                                        id="searchApproval"
+                                        ref="searchApproval"
+                                        v-model="searchApproval"
+                                        class="form-check-input"
+                                        name="searchApproval"
+                                        type="checkbox"
+                                    />
+                                    <label
+                                        class="form-check-label fw-normal"
+                                        for="searchApproval"
+                                        >License</label
+                                    >
+                                </div>
+                                <div class="form-check col">
+                                    <input
+                                        id="searchCompliance"
+                                        ref="searchCompliance"
+                                        v-model="searchCompliance"
+                                        class="form-check-input"
+                                        name="searchCompliance"
+                                        type="checkbox"
+                                    />
+                                    <label
+                                        class="form-check-label fw-normal"
+                                        for="searchCompliance"
+                                        >Compliance with requirements</label
+                                    >
+                                </div>
 
-                                            <TextFilteredField
-                                                id="id_holder"
-                                                :url="filtered_url"
-                                                name="User"
+                                <label
+                                    for=""
+                                    class="col-form-label col-lg-12 fs-5"
+                                    >Keyword(s)</label
+                                >
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="input-group">
+                                            <input
+                                                ref="keyWord"
+                                                v-model="keyWord"
+                                                type="search"
+                                                class="form-control"
+                                                name="details"
+                                                placeholder=""
+                                                @keyup.enter="add"
                                             />
+                                            <button
+                                                type="button"
+                                                class="btn btn-primary"
+                                                @click.prevent="add"
+                                            >
+                                                <i
+                                                    class="bi bi-plus-lg me-2"
+                                                ></i
+                                                >Add Keyword
+                                            </button>
                                         </div>
                                     </div>
-                                    <div class="">
-                                        <div class="col-md-12 text-center">
-                                            <div>
-                                                <input
-                                                    type="button"
-                                                    class="btn btn-primary"
-                                                    style="margin-bottom: 5px"
-                                                    value="View Details"
-                                                    @click.prevent="
-                                                        viewUserDetails
-                                                    "
-                                                />
-                                            </div>
+                                    <div class="col-md-4">
+                                        <div>
+                                            <button
+                                                v-if="searching"
+                                                type="button"
+                                                class="btn btn-primary btn-margin me-3"
+                                                value="Search"
+                                                disabled
+                                            >
+                                                <i class="bi bi-search me-2"></i
+                                                >Search<i
+                                                    class="fa fa-circle-o-notch fa-spin fa-fw ms-2"
+                                                ></i>
+                                            </button>
+                                            <button
+                                                v-else
+                                                type="button"
+                                                class="btn btn-primary btn-margin me-3"
+                                                value="Search"
+                                                :disabled="
+                                                    !searchKeywords ||
+                                                    searchKeywords.length === 0
+                                                "
+                                                @click.prevent="search"
+                                            >
+                                                <i class="bi bi-search me-2"></i
+                                                >Search
+                                            </button>
+                                            <button
+                                                type="reset"
+                                                class="btn btn-primary"
+                                                value="Clear"
+                                                :disabled="
+                                                    !searchKeywords ||
+                                                    searchKeywords.length === 0
+                                                "
+                                                @click.prevent="reset"
+                                            >
+                                                <i class="bi bi-x me-2"></i
+                                                >Clear All Keywords
+                                            </button>
                                         </div>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-                    </FormSection>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-sm-12">
-                    <FormSection
-                        :form-collapse="false"
-                        label="Filter"
-                        index="filter"
-                    >
-                        <div class="row">
-                            <div>
-                                <div class="form-group">
-                                    <label
-                                        for=""
-                                        class="control-label col-lg-12"
-                                        >Filter</label
-                                    >
-                                    <div
-                                        class="form-check form-check-inline col-md-3"
-                                    >
-                                        <input
-                                            id="searchProposal"
-                                            ref="searchProposal"
-                                            v-model="searchProposal"
-                                            class="form-check-input"
-                                            name="searchProposal"
-                                            type="checkbox"
-                                        />
-                                        <label
-                                            class="form-check-label"
-                                            for="searchProposal"
-                                            >Application</label
-                                        >
-                                    </div>
-                                    <div
-                                        class="form-check form-check-inline col-md-3"
-                                    >
-                                        <input
-                                            id="searchApproval"
-                                            ref="searchApproval"
-                                            v-model="searchApproval"
-                                            class="form-check-input"
-                                            name="searchApproval"
-                                            type="checkbox"
-                                        />
-                                        <label
-                                            class="form-check-label"
-                                            for="searchApproval"
-                                            >Licence</label
-                                        >
-                                    </div>
-                                    <div
-                                        class="form-check form-check-inline col-md-3"
-                                    >
-                                        <input
-                                            id="searchCompliance"
-                                            ref="searchCompliance"
-                                            v-model="searchCompliance"
-                                            class="form-check-input"
-                                            name="searchCompliance"
-                                            type="checkbox"
-                                        />
-                                        <label
-                                            class="form-check-label"
-                                            for="searchCompliance"
-                                            >Compliance with requirements</label
-                                        >
-                                    </div>
-                                    <label
-                                        for=""
-                                        class="control-label col-lg-12"
-                                        >Keyword</label
-                                    >
-                                    <div class="col-md-8">
-                                        <input
-                                            v-model="keyWord"
-                                            type="search"
-                                            class="form-control input-sm"
-                                            name="details"
-                                            placeholder=""
-                                        />
-                                    </div>
-                                    <div class="col-md-1"></div>
-                                    <div class="col-md-3">
-                                        <input
-                                            type="button"
-                                            class="btn btn-primary"
-                                            value="Add"
-                                            @click.prevent="add"
-                                        />
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="row">
-                            <div class="col-lg-12">
-                                <ul
-                                    class="list-inline"
-                                    style="display: inline; width: auto"
+                    <!-- Keyword Tags -->
+                    <div class="row mb-1">
+                        <div class="col-lg-12">
+                            <ul class="list-inline">
+                                <li
+                                    v-for="(item, i) in searchKeywords"
+                                    :key="i"
+                                    class="list-inline-item"
                                 >
-                                    <li
-                                        v-for="(item, i) in searchKeywords"
-                                        :key="i"
-                                        class="list-inline-item"
+                                    <button
+                                        class="btn btn-light border"
+                                        @click.prevent=""
                                     >
-                                        <button
-                                            class="btn btn-light"
-                                            style="
-                                                margin-top: 5px;
-                                                margin-bottom: 5px;
-                                            "
-                                            @click.prevent=""
-                                        >
-                                            {{ item }}</button
-                                        ><a
+                                        {{ item }}
+                                        <a
                                             href=""
                                             @click.prevent="removeKeyword(i)"
-                                            ><i class="fas fa-xmark"></i></a>
-                                    </li>
-                                </ul>
-                            </div>
+                                        >
+                                            <span class="bi bi-x ps-2"></span>
+                                        </a>
+                                    </button>
+                                </li>
+                            </ul>
                         </div>
+                    </div>
 
-                        <div class="row">
-                            <div class="col-lg-12">
-                                <div>
-                                    <input
-                                        type="button"
-                                        class="btn btn-primary"
-                                        style="margin-bottom: 5px"
-                                        value="Search"
-                                        @click.prevent="search"
-                                    />
-                                    <input
-                                        type="reset"
-                                        class="btn btn-primary"
-                                        style="margin-bottom: 5px"
-                                        value="Clear"
-                                        @click.prevent="reset"
-                                    />
-                                </div>
-                            </div>
+                    <!-- Preserved Alert Component -->
+                    <div v-if="showMessage" class="row my-2">
+                        <div class="col-lg-12">
+                            <alert type="danger">
+                                <strong>
+                                    <!-- eslint-disable-next-line vue/no-v-html -->
+                                    <p class="mb-0" v-html="messageString"></p>
+                                </strong>
+                            </alert>
                         </div>
-                        <div class="row">
-                            <div class="col-lg-12">
-                                <alert v-if="showMessage" type="danger"
-                                    ><strong>
-                                        <!-- eslint-disable-next-line vue/no-v-html -->
-                                        <p v-html="messageString"></p></strong
-                                ></alert>
-                            </div>
-                        </div>
+                    </div>
 
-                        <div class="row">
-                            <div class="col-lg-12">
-                                <datatable
-                                    :id="datatable_id"
-                                    ref="proposal_datatable"
-                                    :dt-options="proposal_options"
-                                    :dt-headers="proposal_headers"
-                                />
-                            </div>
+                    <!-- Datatable -->
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <datatable
+                                :id="datatable_id"
+                                ref="proposal_datatable"
+                                class="border rounded p-2"
+                                :dt-options="proposal_options"
+                                :dt-headers="proposal_headers"
+                            />
                         </div>
-                    </FormSection>
+                    </div>
+                </FormSection>
             </div>
         </div>
         <div class="row">
             <div class="col-sm-12">
-                    <FormSection
-                        :form-collapse="false"
-                        label="Reference"
-                        index="reference"
-                    >
+                <FormSection
+                    :form-collapse="false"
+                    label="Search Reference Number"
+                    index="reference"
+                >
+                    <div class="row mb-1">
                         <div class="row">
-                            <label
-                                for="input_search_reference"
-                                class="control-label col-lg-12"
-                                >Reference</label
-                            >
-                            <div class="col-md-8">
-                                <input
-                                    id="input_search_reference"
-                                    v-model="referenceWord"
-                                    type="search"
-                                    class="form-control input-sm"
-                                    name="referenceWord"
-                                    placeholder=""
-                                />
+                            <div class="col-md-4">
+                                <div class="input-group">
+                                    <input
+                                        ref="referenceWord"
+                                        v-model="referenceWord"
+                                        type="search"
+                                        class="form-control input-sm"
+                                        name="referenceWord"
+                                        placeholder="reference number"
+                                        required
+                                        @input="resetError"
+                                    />
+                                    <input
+                                        type="button"
+                                        class="btn btn-primary"
+                                        value="Search"
+                                        @click.prevent="
+                                            search_reference(
+                                                $refs.referenceWord
+                                            )
+                                        "
+                                    />
+                                </div>
                             </div>
-                            <div>
-                                <input
-                                    type="button"
-                                    class="btn btn-primary"
-                                    style="margin-bottom: 5px"
-                                    value="Search"
-                                    @click.prevent="search_reference"
-                                />
-                            </div>
+                        </div>
+                        <div class="mt-3">
                             <alert v-if="showError" type="danger"
                                 ><strong>{{ errorString }}</strong></alert
                             >
                         </div>
-                    </FormSection>
+                    </div>
+                </FormSection>
+
+                <!-- <FormSection
+                    :form-collapse="false"
+                    label="Reference"
+                    index="reference"
+                >
+                    <div class="row">
+                        <label
+                            for="input_search_reference"
+                            class="control-label col-lg-12"
+                            >Reference</label
+                        >
+                        <div class="col-md-8">
+                            <input
+                                id="input_search_reference"
+                                v-model="referenceWord"
+                                type="search"
+                                class="form-control input-sm"
+                                name="referenceWord"
+                                placeholder=""
+                            />
+                        </div>
+                        <div>
+                            <input
+                                type="button"
+                                class="btn btn-primary"
+                                style="margin-bottom: 5px"
+                                value="Search"
+                                @click.prevent="search_reference"
+                            />
+                        </div>
+                        <alert v-if="showError" type="danger"
+                            ><strong>{{ errorString }}</strong></alert
+                        >
+                    </div>
+                </FormSection> -->
             </div>
         </div>
     </div>
@@ -323,6 +367,7 @@ export default {
             uBody: 'uBody' + uuid(),
             kBody: 'kBody' + uuid(),
             loading: [],
+            searching: false,
             filtered_url: api_endpoints.filtered_users + '?search=',
             filtered_org_url: api_endpoints.filtered_organisations + '?search=',
             user_id: null,
@@ -435,9 +480,7 @@ export default {
         $('a[data-bs-toggle="collapse"]').on('click', function () {
             var chev = $(this).children()[0];
             window.setTimeout(function () {
-                $(chev).toggleClass(
-                    'fa-chevron-down fa-chevron-up'
-                );
+                $(chev).toggleClass('fa-chevron-down fa-chevron-up');
             }, 100);
         });
     },
@@ -467,7 +510,6 @@ export default {
                 });
         },
         viewOrgDetails: function () {
-            let vm = this;
             let form = document.forms.searchOrganisationForm;
             const org_selected = form.elements['Organisation-selected'];
             const ledger_selected =
@@ -536,8 +578,8 @@ export default {
             let vm = this;
             console.log('Calling search');
             vm.$refs.proposal_datatable.vmDataTable.clear();
-            if(vm.searchKeywords.length == 0 && vm.keyWord) {
-               vm.searchKeywords.push(vm.keyWord);
+            if (vm.searchKeywords.length == 0 && vm.keyWord) {
+                vm.searchKeywords.push(vm.keyWord);
             }
             vm.keyWord = '';
             vm.$refs.proposal_datatable.vmDataTable.draw();
@@ -571,7 +613,8 @@ export default {
                                 });
                             } else {
                                 vm.hasErrors = true;
-                                vm.errorString = 'Unexpected search response format';
+                                vm.errorString =
+                                    'Unexpected search response format';
                             }
                         },
                         (error) => {
@@ -585,3 +628,76 @@ export default {
     },
 };
 </script>
+
+<style scoped>
+/* 1. Force the root wrapper and its internal form-group to grow */
+.input-group > .flex-grow-1 {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+}
+
+.input-group > .flex-grow-1 .form-group {
+    margin-bottom: 0;
+    width: 100%;
+}
+
+/* 2. Force v-select to take 100% of the space */
+.input-group :deep(.organisation-search),
+.input-group :deep(.v-select) {
+    width: 100% !important;
+}
+
+/* 3. Style v-select toggle to seamlessly attach to the button */
+.input-group :deep(.vs__dropdown-toggle) {
+    min-height: 38px;
+    background-color: #fff;
+    border-top-right-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+}
+
+/* 4. Button radius and height matching */
+.input-group > .btn {
+    border-top-left-radius: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    white-space: nowrap;
+}
+
+/* 1. Placeholder text */
+:deep(.v-select .vs__search::placeholder) {
+    color: var(--bs-secondary-color, #6c757d) !important;
+}
+
+/* 2. User input / typed text */
+:deep(.v-select .vs__search) {
+    color: var(--bs-body-color, #212529) !important;
+}
+
+/* 3. Selected option text */
+:deep(.v-select .vs__selected) {
+    color: var(--bs-body-color, #212529) !important;
+}
+
+/* 4. Dropdown options text */
+:deep(.v-select .vs__dropdown-option) {
+    color: var(--bs-body-color, #212529) !important;
+}
+
+/* 5. Dropdown option hover/highlight text & background (BS5 style) */
+:deep(.v-select .vs__dropdown-option--highlight) {
+    background: var(--bs-primary, #0d6efd) !important;
+    color: #fff !important;
+}
+
+/* 6. Muted helper / "no options" / trading name text */
+:deep(.v-select .bs5-muted-text),
+:deep(.v-select .vs__no-options),
+:deep(.v-select span) {
+    color: var(--bs-secondary-color, #6c757d);
+}
+
+/* 7. Dropdown arrow & clear button icons */
+:deep(.v-select .vs__open-indicator),
+:deep(.v-select .vs__clear) {
+    fill: var(--bs-secondary-color, #6c757d) !important;
+}
+</style>
