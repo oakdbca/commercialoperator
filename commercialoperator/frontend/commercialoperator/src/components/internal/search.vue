@@ -1,5 +1,6 @@
 <template>
     <div id="internalSearch" class="container">
+        <!-- Search Organisation -->
         <div class="row mb-3">
             <div class="col-sm-12">
                 <FormSection
@@ -9,28 +10,22 @@
                 >
                     <div class="row my-3">
                         <form name="searchOrganisationForm">
-                            <div class="col-md-6">
-                                <div class="input-group">
-                                    <TextFilteredOrgField
-                                        id="id_org"
-                                        class="flex-grow-1"
-                                        :url="filtered_org_url"
-                                        name="Organisation"
-                                    />
-                                    <button
-                                        type="button"
-                                        class="btn btn-primary"
-                                        @click.prevent="viewOrgDetails"
-                                    >
-                                        View Details
-                                    </button>
-                                </div>
+                            <div class="col-md-4">
+                                <TextFilteredOrgField
+                                    id="id_org"
+                                    :url="filtered_org_url"
+                                    name="Organisation"
+                                    @selected="viewOrgDetails"
+                                    @option:selected="viewOrgDetails"
+                                />
                             </div>
                         </form>
                     </div>
                 </FormSection>
             </div>
         </div>
+
+        <!-- Search User -->
         <div class="row mb-3">
             <div class="col-sm-12">
                 <FormSection
@@ -40,28 +35,21 @@
                 >
                     <div class="row my-3">
                         <form name="searchUserForm">
-                            <div class="col-md-6">
-                                <div class="input-group">
-                                    <TextFilteredField
-                                        id="id_holder"
-                                        class="flex-grow-1"
-                                        :url="filtered_url"
-                                        name="User"
-                                    />
-                                    <button
-                                        type="button"
-                                        class="btn btn-primary"
-                                        @click.prevent="viewUserDetails"
-                                    >
-                                        View Details
-                                    </button>
-                                </div>
+                            <div class="col-md-4">
+                                <TextFilteredField
+                                    id="id_holder"
+                                    :url="filtered_url"
+                                    name="User"
+                                    @selected="viewUserDetails"
+                                />
                             </div>
                         </form>
                     </div>
                 </FormSection>
             </div>
         </div>
+
+        <!-- Search Keywords -->
         <div class="row mb-3">
             <div class="col-sm-12">
                 <FormSection
@@ -226,7 +214,7 @@
                         </div>
                     </div>
 
-                    <!-- Preserved Alert Component -->
+                    <!-- Alert Component -->
                     <div v-if="showMessage" class="row my-2">
                         <div class="col-lg-12">
                             <alert type="danger">
@@ -253,6 +241,8 @@
                 </FormSection>
             </div>
         </div>
+
+        <!-- Search Reference Number -->
         <div class="row">
             <div class="col-sm-12">
                 <FormSection
@@ -294,46 +284,11 @@
                         </div>
                     </div>
                 </FormSection>
-
-                <!-- <FormSection
-                    :form-collapse="false"
-                    label="Reference"
-                    index="reference"
-                >
-                    <div class="row">
-                        <label
-                            for="input_search_reference"
-                            class="control-label col-lg-12"
-                            >Reference</label
-                        >
-                        <div class="col-md-8">
-                            <input
-                                id="input_search_reference"
-                                v-model="referenceWord"
-                                type="search"
-                                class="form-control input-sm"
-                                name="referenceWord"
-                                placeholder=""
-                            />
-                        </div>
-                        <div>
-                            <input
-                                type="button"
-                                class="btn btn-primary"
-                                style="margin-bottom: 5px"
-                                value="Search"
-                                @click.prevent="search_reference"
-                            />
-                        </div>
-                        <alert v-if="showError" type="danger"
-                            ><strong>{{ errorString }}</strong></alert
-                        >
-                    </div>
-                </FormSection> -->
             </div>
         </div>
     </div>
 </template>
+
 <script>
 import $ from 'jquery';
 import datatable from '@/utils/vue/datatable.vue';
@@ -420,7 +375,7 @@ export default {
                 pageLength: 10,
                 columns: [
                     { data: 'number', name: 'lodgement_number' },
-                    // NOTE: Changing all columns below to be neither searchable nor orderable, b/c this table's dataset consists of thee different models
+                    // NOTE: Changing all columns below to be neither searchable nor orderable, b/c this table's dataset consists of three different models
                     { data: 'type', searchable: false, orderable: false },
                     { data: 'applicant', searchable: false, orderable: false },
                     {
@@ -509,45 +464,67 @@ export default {
                     vm.selected_organisation = selected.val();
                 });
         },
-        viewOrgDetails: function () {
-            let form = document.forms.searchOrganisationForm;
-            const org_selected = form.elements['Organisation-selected'];
-            const ledger_selected =
-                form.elements['Organisation-selected-ledger'];
-            const org_id =
-                (ledger_selected && ledger_selected.value) ||
-                (org_selected && org_selected.value);
+        viewOrgDetails: function (selected) {
+            let org_id = null;
+            if (selected) {
+                org_id =
+                    selected.id ||
+                    selected.value ||
+                    (typeof selected === 'number' ||
+                    typeof selected === 'string'
+                        ? selected
+                        : null);
+            }
+
+            // Fallback to form hidden elements if not directly passed
+            if (!org_id) {
+                const form = document.forms.searchOrganisationForm;
+                if (form) {
+                    const org_selected = form.elements['Organisation-selected'];
+                    const ledger_selected =
+                        form.elements['Organisation-selected-ledger'];
+                    org_id =
+                        (ledger_selected && ledger_selected.value) ||
+                        (org_selected && org_selected.value);
+                }
+            }
+
             if (org_id) {
-                window.location.href = `/ledger-ui/organisation/${org_id}`;
-            } else {
-                swal.fire({
-                    title: 'Organisation not selected',
-                    html: 'Please select the organisation to view the details',
-                    icon: 'error',
-                }).then(() => {});
-                return;
+                window.open(`/ledger-ui/organisation/${org_id}`, '_blank');
             }
         },
-        viewUserDetails: function () {
+        viewUserDetails: function (selected) {
             let vm = this;
-            let form = document.forms.searchUserForm;
-            var user_selected = form.elements['User-selected'];
-            if (user_selected != undefined || user_selected != null) {
-                var user_id = user_selected.value;
-                vm.$router.push({
+            let user_id = null;
+            if (selected) {
+                user_id =
+                    selected.id ||
+                    selected.value ||
+                    (typeof selected === 'number' ||
+                    typeof selected === 'string'
+                        ? selected
+                        : null);
+            }
+
+            // Fallback to form hidden elements if not directly passed
+            if (!user_id) {
+                const form = document.forms.searchUserForm;
+                if (form) {
+                    const user_selected = form.elements['User-selected'];
+                    if (user_selected) {
+                        user_id = user_selected.value;
+                    }
+                }
+            }
+
+            if (user_id) {
+                const routeData = vm.$router.resolve({
                     name: 'internal-user-detail',
                     params: { user_id: user_id },
                 });
-            } else {
-                swal.fire({
-                    title: 'User not selected',
-                    html: 'Please select the user to view the details',
-                    icon: 'error',
-                }).then(() => {});
-                return;
+                window.open(routeData.href, '_blank');
             }
         },
-
         add: function () {
             let vm = this;
             const typedKeyword = (vm.keyWord || '').trim();
@@ -630,72 +607,46 @@ export default {
 </script>
 
 <style scoped>
-/* 1. Force the root wrapper and its internal form-group to grow */
-.input-group > .flex-grow-1 {
-    flex: 1 1 0% !important;
-    min-width: 0 !important;
-}
-
-.input-group > .flex-grow-1 .form-group {
-    margin-bottom: 0;
-    width: 100%;
-}
-
-/* 2. Force v-select to take 100% of the space */
-.input-group :deep(.organisation-search),
-.input-group :deep(.v-select) {
+/* 1. Force v-select to take 100% of the space */
+:deep(.organisation-search),
+:deep(.v-select) {
     width: 100% !important;
 }
 
-/* 3. Style v-select toggle to seamlessly attach to the button */
-.input-group :deep(.vs__dropdown-toggle) {
-    min-height: 38px;
-    background-color: #fff;
-    border-top-right-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-}
-
-/* 4. Button radius and height matching */
-.input-group > .btn {
-    border-top-left-radius: 0 !important;
-    border-bottom-left-radius: 0 !important;
-    white-space: nowrap;
-}
-
-/* 1. Placeholder text */
+/* 2. Placeholder text */
 :deep(.v-select .vs__search::placeholder) {
     color: var(--bs-secondary-color, #6c757d) !important;
 }
 
-/* 2. User input / typed text */
+/* 3. User input / typed text */
 :deep(.v-select .vs__search) {
     color: var(--bs-body-color, #212529) !important;
 }
 
-/* 3. Selected option text */
+/* 4. Selected option text */
 :deep(.v-select .vs__selected) {
     color: var(--bs-body-color, #212529) !important;
 }
 
-/* 4. Dropdown options text */
+/* 5. Dropdown options text */
 :deep(.v-select .vs__dropdown-option) {
     color: var(--bs-body-color, #212529) !important;
 }
 
-/* 5. Dropdown option hover/highlight text & background (BS5 style) */
+/* 6. Dropdown option hover/highlight text & background (BS5 style) */
 :deep(.v-select .vs__dropdown-option--highlight) {
     background: var(--bs-primary, #0d6efd) !important;
     color: #fff !important;
 }
 
-/* 6. Muted helper / "no options" / trading name text */
+/* 7. Muted helper / "no options" / trading name text */
 :deep(.v-select .bs5-muted-text),
 :deep(.v-select .vs__no-options),
 :deep(.v-select span) {
     color: var(--bs-secondary-color, #6c757d);
 }
 
-/* 7. Dropdown arrow & clear button icons */
+/* 8. Dropdown arrow & clear button icons */
 :deep(.v-select .vs__open-indicator),
 :deep(.v-select .vs__clear) {
     fill: var(--bs-secondary-color, #6c757d) !important;
