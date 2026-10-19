@@ -1,33 +1,31 @@
 from django.conf import settings
-from django.urls import re_path as url
 from django.conf.urls import include
 from django.conf.urls.static import static
+from django.urls import re_path as url
+from django_media_serv.urls import urlpatterns as media_serv_patterns
+from ledger_api_client.urls import urlpatterns as ledger_patterns
 from rest_framework import routers
 
-from commercialoperator.admin import admin
 from commercialoperator import views
-from commercialoperator.components.proposals import views as proposal_views
-from commercialoperator.components.organisations import views as organisation_views
-from commercialoperator.components.bookings import views as booking_views
-
-from commercialoperator.components.users import api as users_api
-from commercialoperator.components.organisations import api as org_api
-from commercialoperator.components.main import api as main_api
+from commercialoperator.admin import admin
+from commercialoperator.components.approvals import api as approval_api
 from commercialoperator.components.bookings import api as booking_api
+from commercialoperator.components.bookings import views as booking_views
+from commercialoperator.components.compliances import api as compliances_api
+from commercialoperator.components.main import api as main_api
+from commercialoperator.components.organisations import api as org_api
+from commercialoperator.components.organisations import views as organisation_views
 
 # T Class
 from commercialoperator.components.proposals import api as proposal_api
-from commercialoperator.components.approvals import api as approval_api
-from commercialoperator.components.compliances import api as compliances_api
-
-# Filming
-from commercialoperator.components.proposals import api_filming as proposal_api_filming
 
 # Event
 from commercialoperator.components.proposals import api_event as proposal_api_event
 
-from ledger_api_client.urls import urlpatterns as ledger_patterns
-from django_media_serv.urls import urlpatterns as media_serv_patterns
+# Filming
+from commercialoperator.components.proposals import api_filming as proposal_api_filming
+from commercialoperator.components.proposals import views as proposal_views
+from commercialoperator.components.users import api as users_api
 
 # API patterns
 router = routers.DefaultRouter()
@@ -161,11 +159,13 @@ router.register(
     proposal_api_event.ProposalEventsTrailsViewSet,
     "proposal_events_trails",
 )
-router.register(
-    r"search_proposals",
-    proposal_api.SearchProposalsViewSet,
-    "search-proposals",
-),
+(
+    router.register(
+        r"search_proposals",
+        proposal_api.SearchProposalsViewSet,
+        "search-proposals",
+    ),
+)
 
 api_patterns = [
     url(
@@ -227,9 +227,10 @@ api_patterns = [
         name="accreditation_choices",
     ),
     url(
-        r'^api/tourism_standard_choices',
+        r"^api/tourism_standard_choices",
         proposal_api.TourismStandardsView.as_view(),
-        name='tourism_standard_choices',),
+        name="tourism_standard_choices",
+    ),
     url(
         r"^api/licence_period_choices",
         proposal_api.LicencePeriodChoicesView.as_view(),
@@ -474,8 +475,10 @@ urlpatterns = (
             booking_views.SessionAbortRedirectView.as_view(),
             name="booking-session-abort-redirect",
         ),
-        url(r'^private-media/', views.getPrivateFile, name='view_private_file'),
-        url(r'^email-exports/$', views.EmailExportsView.as_view(), name='email-exports'),
+        url(r"^private-media/", views.getPrivateFile, name="view_private_file"),
+        url(
+            r"^email-exports/$", views.EmailExportsView.as_view(), name="email-exports"
+        ),
     ]
     + ledger_patterns
     + media_serv_patterns
